@@ -1,3 +1,4 @@
+import { jwtSecret } from './jwt-secret';
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
@@ -19,9 +20,10 @@ export class JwtAuthGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync(
         token,
         {
-          secret: 'S3CR370'
+          secret: jwtSecret()
         }
       );
+      if (payload.tokenUse !== 'access') throw new UnauthorizedException();
       request["user"] = payload;
     } catch {
       throw new UnauthorizedException();
@@ -31,8 +33,6 @@ export class JwtAuthGuard implements CanActivate {
 
   private extractTokenFromHeader(request: Request): string | undefined {
     const authorization = request.headers['authorization'];
-    console.log(request.headers);
-    console.log(authorization);
     const [type, token] = authorization?.split(' ') ?? [];
     return type === 'Bearer' ? token : undefined;
   }

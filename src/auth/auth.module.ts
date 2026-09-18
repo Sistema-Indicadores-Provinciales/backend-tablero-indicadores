@@ -12,7 +12,7 @@ import { UserModule } from 'src/user/user.module';
     UserModule,
     JwtModule.register({
       global: true,
-      secret: 'S3CR370',
+
     }),
   ],
   providers: [AuthService],

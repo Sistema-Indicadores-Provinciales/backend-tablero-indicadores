@@ -3,7 +3,7 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument } from './user.schema';
 import { Model, Types } from 'mongoose';
-import { Dashboard } from 'src/dashboard/dashboard.schema';
+import { Dashboard } from '../dashboard/dashboard.schema';
 
 @Injectable()
 export class UserService {
@@ -68,7 +68,7 @@ export class UserService {
     const result = await Promise.all(
       user.access.map(async (a) => {
         const dashboard = await this.dashboardModel
-          .findOne({ _id: a.dashboard, show: true })
+          .findOne({ _id: a.dashboard, show: true, deletedAt: null })
           .populate('sections', 'keyname name show')
           .exec();
 
@@ -76,6 +76,8 @@ export class UserService {
 
         const accessibleSections = (dashboard.sections as any[])
           .filter(s => s.show && a.sections.some(id => id.toString() === s._id.toString()));
+
+        if (dashboard.generatedWorkspaceId && !accessibleSections.length) return null;
 
         return {
           keyname: dashboard.keyname,

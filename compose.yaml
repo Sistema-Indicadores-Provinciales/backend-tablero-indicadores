@@ -1,0 +1,51 @@
+services:
+  backend:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MONGODB_URL: ${MONGODB_URL:?Configurá MONGODB_URL}
+      JWT_SECRET: ${JWT_SECRET:?Configurá JWT_SECRET}
+      CORS_ORIGINS: ${PUBLIC_ORIGIN:?Configurá PUBLIC_ORIGIN}
+      COOKIE_PATH: /api/auth/refresh
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  analytics:
+    build: ./analytics-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      MONGODB_URL: ${MONGODB_URL:?Configurá MONGODB_URL}
+      JWT_SECRET: ${JWT_SECRET:?Configurá JWT_SECRET}
+      CORS_ORIGINS: ${PUBLIC_ORIGIN:?Configurá PUBLIC_ORIGIN}
+      ANALYTICS_STORAGE: /app/storage
+      GOOGLE_SHEETS_API_KEY: ${GOOGLE_SHEETS_API_KEY:-}
+    volumes:
+      - analytics_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    mem_limit: 2g
+  web:
+    build:
+      context: ../frontend-tablero-indicadores
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+      analytics:
+        condition: service_healthy
+volumes:
+  analytics_storage:

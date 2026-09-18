@@ -20,7 +20,7 @@ export class SectionsService {
   }
 
   async getAllSections(): Promise<SectionDocument[]> {
-    return await this.sectionModel.find().exec();
+    return await this.sectionModel.find({ deletedAt: null }).exec();
   }
 
   async editSection(sectionId: string, newKeyname?: string, newName?: string, show?: boolean) {
@@ -33,7 +33,7 @@ export class SectionsService {
 
       if (Object.keys(updateData).length > 0) {
         const editedSection = await this.sectionModel.findOneAndUpdate(
-          { _id: sectionId },
+          { _id: sectionId, deletedAt: null },
           { $set: updateData },
           { new: true }
         );
@@ -47,7 +47,4 @@ export class SectionsService {
     }
   }
 
-  async deleteSection(sectionId: string): Promise<SectionDocument> {
-    return await this.sectionModel.findByIdAndDelete(sectionId);
-  }
 }

@@ -1,3 +1,4 @@
+import { AdminGuard } from '../auth/admin.guard';
 import { Body, Controller, Delete, Get, HttpException, HttpStatus, Param, Post, Put, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { User, UserDocument } from './user.schema';
@@ -11,15 +12,17 @@ export class UserController {
   @Get()
   getProfile(@Request() req) {
     const { username, profileType, access } = req.user as UserDocument;
-    return { username, profileType, access };
+    return { _id: req.user.sub, username, profileType, access };
   }
 
+  @UseGuards(AdminGuard)
   @Post()
   async createNewUser(@Body() body: any) {
     const { username, password, email, profileType } = body;
     return this.userService.createNewUser(username, password, email, profileType);
   }
 
+  @UseGuards(AdminGuard)
   @Delete()
   async deleteUser(@Body() body: any) {
     const { username, email } = body;
@@ -33,11 +36,15 @@ export class UserController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AdminGuard)
   @Get('get-all')
   async getAllUsers(): Promise<User[]> {
     try {
-      return await this.userService.getAllUsers();
+      const users = await this.userService.getAllUsers();
+      return users.map((user: any) => {
+        const { password, refreshToken, ...safe } = user.toObject ? user.toObject() : user;
+        return safe;
+      });
     } catch (error) {
       throw new HttpException(
         `Error al obtener los usuarios: ${error.message}`,
@@ -46,7 +53,7 @@ export class UserController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AdminGuard)
   @Post('access/:userId')
   async updateAccess(
     @Param('userId') userId: string,

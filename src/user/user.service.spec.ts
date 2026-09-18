@@ -1,18 +1,49 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Types } from 'mongoose';
 import { UserService } from './user.service';
 
-describe('UserService', () => {
-  let service: UserService;
+const generatedId = new Types.ObjectId();
+const sectionId = new Types.ObjectId();
+const hiddenId = new Types.ObjectId();
+const legacyId = new Types.ObjectId();
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [UserService],
-    }).compile();
+function fixture() {
+  const account = { access: [
+    { dashboard: generatedId, sections: [sectionId, hiddenId] },
+    { dashboard: legacyId, sections: [] },
+  ] };
+  const generated = { _id: generatedId, keyname: 'ingresos', name: 'Ingresos', icon: 'chart', show: true,
+    generatedWorkspaceId: 'saved', sections: [
+      { _id: sectionId, keyname: 'graficos', name: 'Gráficos', show: true },
+      { _id: hiddenId, keyname: 'oculta', show: false },
+    ] };
+  const dashboards = [generated, { _id: legacyId, keyname: 'economia', name: 'Economía', show: true, sections: [] }];
+  const userModel = { findById: () => ({ exec: async () => account }) };
+  const dashboardModel = { findOne: ({ _id, show }: any) => ({ populate: () => ({
+    exec: async () => dashboards.find(d => d._id.equals(_id) && d.show === show),
+  }) }) };
+  return { account, generated, service: new UserService(userModel as any, dashboardModel as any) };
+}
 
-    service = module.get<UserService>(UserService);
-  });
+test('generated dashboards use the same current user access as the existing menu', async () => {
+  const { service } = fixture();
+  const menu = await service.getMyDashboards('user');
+  expect(menu.map(d => d.keyname)).toEqual(['ingresos', 'economia']);
+  expect(menu[0].sections).toEqual(['graficos']);
+});
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
+test('revoking the generated section removes its dashboard from the menu', async () => {
+  const { service, account } = fixture();
+  await service.getMyDashboards('user');
+  account.access[0].sections = [];
+  const menu = await service.getMyDashboards('user');
+  expect(menu.map(d => d.keyname)).toEqual(['economia']);
+});
+
+test('disabling the generated dashboard or its only accessible section hides it', async () => {
+  const { service, generated } = fixture();
+  generated.show = false;
+  expect((await service.getMyDashboards('user')).map(d => d.keyname)).toEqual(['economia']);
+  generated.show = true;
+  generated.sections[0].show = false;
+  expect((await service.getMyDashboards('user')).map(d => d.keyname)).toEqual(['economia']);
 });

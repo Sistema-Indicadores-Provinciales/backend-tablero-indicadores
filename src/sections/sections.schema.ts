@@ -16,6 +16,12 @@ export class Section {
 
   @Prop({ default: false })
   linked: boolean;
+
+  @Prop()
+  workspaceId?: string;
+
+  @Prop()
+  deletedAt?: Date;
 }
 
 export const SectionSchema = SchemaFactory.createForClass(Section);

@@ -1,11 +1,25 @@
+import { Delete, UseGuards } from '@nestjs/common';
+import { DashboardLifecycleService } from './dashboard-lifecycle.service';
+import { JwtAuthGuard } from '../auth/auth.guard';
+import { AdminGuard } from '../auth/admin.guard';
 import { Body, Controller, Get, HttpException, HttpStatus, Param, Post, Put } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { Dashboard } from './dashboard.schema';
 
+@UseGuards(JwtAuthGuard)
 @Controller('dashboard')
 export class DashboardController {
-  constructor(private readonly dashboardService: DashboardService) {}
+  constructor(private readonly dashboardService: DashboardService, private readonly lifecycle: DashboardLifecycleService) {}
 
+  @UseGuards(AdminGuard)
+  @Delete(':dashboardId')
+  deleteDashboard(@Param('dashboardId') id: string) { return this.lifecycle.deleteDashboard(id); }
+
+  @UseGuards(AdminGuard)
+  @Post('reconcile-generated')
+  reconcileGenerated() { return this.lifecycle.reconcileGenerated(); }
+
+  @UseGuards(AdminGuard)
   @Post()
   async createNewDashboard(@Body() body: any) {
     const { keyname, name, show, icon } = body;
@@ -25,6 +39,7 @@ export class DashboardController {
     }
   }
 
+  @UseGuards(AdminGuard)
   @Put('edit/:dashboardId')
   async editDashboard(
     @Param('dashboardId') dashboardId: string,
@@ -40,6 +55,7 @@ export class DashboardController {
     return this.dashboardService.editDashboard(dashboardId, newKeyname, newName, show, icon);
   }
 
+  @UseGuards(AdminGuard)
   @Post('add/:dashboardId')
   async addSection(
     @Param('dashboardId') dashboardId: string,

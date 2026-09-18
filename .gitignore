@@ -85,3 +85,8 @@ analytics-service/logs/
 *.egg-info/
 .eggs/
 /uploads/
+
+/analytics-service/storage/
+/analytics-service/.venv/
+
+.env.production

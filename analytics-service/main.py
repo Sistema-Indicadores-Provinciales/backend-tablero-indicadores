@@ -5,10 +5,15 @@ import traceback
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.generator import router, user, UPLOADS, MAX_BYTES
+from app.data_engine import DataError, safe
+from app.cors_origins import cors_origins
+from pymongo.errors import PyMongoError
+from pathlib import Path
 from app.charts import prepare_chart_data
 from app.excel_utils import get_excel_sheets, read_excel_data
 
@@ -22,9 +27,23 @@ app = FastAPI(
     version="1.3.0",
 )
 
+app.include_router(router)
+
+@app.exception_handler(DataError)
+async def data_error(request: Request, exc: DataError):
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+@app.exception_handler(PyMongoError)
+async def database_error(request: Request, exc: PyMongoError):
+    return JSONResponse(status_code=503, content={"detail": "La base de datos no está disponible. Reintentá."})
+
+@app.exception_handler(ValueError)
+async def invalid_file(request: Request, exc: ValueError):
+    return JSONResponse(status_code=422, content={"detail": "No se pudo interpretar el archivo. Revisá su formato y encabezados."})
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,8 +53,8 @@ app.add_middleware(
 # Carpetas
 # ---------------------------------------------------------------------------
 
-UPLOAD_DIR = "uploads"
-DATA_DIR = "data"
+UPLOAD_DIR = str(Path(__file__).resolve().parent / "uploads")
+DATA_DIR = str(Path(__file__).resolve().parent / "data")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -45,20 +64,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # ---------------------------------------------------------------------------
 
 def safe_value(val):
-    """Convierte cualquier tipo numpy/pandas a tipo Python nativo serializable por JSON."""
-    if val is None:
-        return None
-    if isinstance(val, float) and math.isnan(val):
-        return None
-    if isinstance(val, np.integer):
-        return int(val)
-    if isinstance(val, np.floating):
-        return float(val)
-    if isinstance(val, np.bool_):
-        return bool(val)
-    if isinstance(val, pd.Timestamp):
-        return val.isoformat()
-    return val
+    return safe(val)
 
 
 def serialize_records(df: pd.DataFrame) -> list[dict]:
@@ -73,40 +79,21 @@ def serialize_records(df: pd.DataFrame) -> list[dict]:
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@app.post("/upload/")
+@app.post("/upload/", dependencies=[Depends(user)])
 async def upload_excel(file: UploadFile = File(...)):
-    try:
-        if not file.filename.endswith((".xlsx", ".xls")):
-            raise HTTPException(
-                status_code=400,
-                detail="El archivo debe ser un Excel (.xlsx o .xls)",
-            )
-
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
-        with open(file_path, "wb") as f:
-            f.write(await file.read())
-
-        sheets = get_excel_sheets(file_path)
-        if not sheets:
-            raise HTTPException(status_code=400, detail="El archivo no contiene hojas válidas")
-
-        return {"filename": file.filename, "sheets": sheets}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error al subir el archivo: {str(e)}")
+    raise HTTPException(410, "Usá el nuevo generador para subir archivos de forma privada.")
 
 
-@app.post("/read-columns/")
+@app.post("/read-columns/", dependencies=[Depends(user)])
 async def read_columns(filename: str = Form(...), sheet_name: str = Form(...)):
     """
     Lee columnas, datos y metadatos de valores únicos por columna.
     El frontend usa column_meta para construir los filtros dinámicos.
     """
     try:
-        file_path = os.path.join(UPLOAD_DIR, filename)
+        file_path = str((Path(UPLOAD_DIR) / filename).resolve())
+        if Path(file_path).parent != Path(UPLOAD_DIR).resolve():
+            raise HTTPException(status_code=400, detail="Nombre de archivo no válido")
 
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="El archivo no existe")
@@ -147,7 +134,7 @@ async def read_columns(filename: str = Form(...), sheet_name: str = Form(...)):
         raise HTTPException(status_code=500, detail=f"Error al leer columnas: {str(e)}")
 
 
-@app.post("/generate-chart/")
+@app.post("/generate-chart/", dependencies=[Depends(user)])
 async def generate_chart(
     filename: str = Form(...),
     sheet_name: str = Form(...),
@@ -155,7 +142,9 @@ async def generate_chart(
     y_col: str = Form(...),
 ):
     try:
-        file_path = os.path.join(UPLOAD_DIR, filename)
+        file_path = str((Path(UPLOAD_DIR) / filename).resolve())
+        if Path(file_path).parent != Path(UPLOAD_DIR).resolve():
+            raise HTTPException(status_code=400, detail="Nombre de archivo no válido")
 
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="El archivo no existe")
@@ -181,7 +170,7 @@ async def generate_chart(
         raise HTTPException(status_code=500, detail=f"Error al generar datos del gráfico: {str(e)}")
 
 
-@app.post("/filter-data/")
+@app.post("/filter-data/", dependencies=[Depends(user)])
 async def filter_data(
     filename: str = Form(...),
     sheet_name: str = Form(...),
@@ -197,7 +186,9 @@ async def filter_data(
     - group_col: columna para segmentar en series (ej: CURSO, NIVEL, GESTION)
     """
     try:
-        file_path = os.path.join(UPLOAD_DIR, filename)
+        file_path = str((Path(UPLOAD_DIR) / filename).resolve())
+        if Path(file_path).parent != Path(UPLOAD_DIR).resolve():
+            raise HTTPException(status_code=400, detail="Nombre de archivo no válido")
 
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="El archivo no existe")
@@ -335,7 +326,7 @@ async def filter_data(
 async def health_check():
     return {"status": "ok", "message": "Servicio FastAPI activo y funcionando."}
 
-@app.post("/system-data/read-columns/")
+@app.post("/system-data/read-columns/", dependencies=[Depends(user)])
 async def system_read_columns(filename: str = Form(...), sheet_name: str = Form(...)):
     try:
         # Busca el archivo en data/ recursivamente

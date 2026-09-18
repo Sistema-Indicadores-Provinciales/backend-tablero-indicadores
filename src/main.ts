@@ -1,3 +1,5 @@
+import { jwtSecret } from './auth/jwt-secret';
+import { corsOrigins } from './config/cors-origins';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './response/response.interceptor';
@@ -8,6 +10,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
   
+  jwtSecret();
   app.use(cookieParser())
   // Aplica el interceptor globalmente para respuestas exitosas
   app.useGlobalInterceptors(new ResponseInterceptor());
@@ -15,30 +18,8 @@ async function bootstrap() {
   // Aplica el filtro globalmente para manejar excepciones
   app.useGlobalFilters(new ResponseFilter());
 
-  const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:4173',
-  ];
+  app.enableCors({ origin: corsOrigins(), credentials: true });
 
-  const allowedSubnet = process.env.CORS_ALLOWED_SUBNET;
-
-  app.enableCors({
-    origin: (origin, callback) => {
-      const isAllowed =
-        !origin ||
-        allowedOrigins.includes(origin) ||
-        (
-          allowedSubnet &&
-          origin.startsWith(`http://${allowedSubnet}.`)
-        );
-
-      callback(
-        isAllowed ? null : new Error('Not allowed by CORS'),
-        isAllowed,
-      );
-    },
-    credentials: true,
-  });
 
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }

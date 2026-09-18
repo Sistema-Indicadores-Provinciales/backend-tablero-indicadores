@@ -1,0 +1,11 @@
+node_modules
+.git
+dist
+.env
+.env.*
+!.env.example
+*.log
+analytics-service/storage
+analytics-service/uploads
+analytics-service/.venv
+**/__pycache__

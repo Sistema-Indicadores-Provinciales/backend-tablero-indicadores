@@ -1,3 +1,4 @@
+import { jwtSecret } from './jwt-secret';
 import * as bcrypt from 'bcryptjs'
 import { HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -29,13 +30,13 @@ export class AuthService {
   async login(user: any) {
     const payload = { username: user.username, sub: user._id, profileType: user.profileType, access: user.access };
 
-    const accessToken = this.jwtService.sign(payload, {
-      secret: 'S3CR370',
+    const accessToken = this.jwtService.sign({ ...payload, tokenUse: 'access' }, {
+      secret: jwtSecret(),
       expiresIn: '1h'
     });
 
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: 'S3CR370',
+    const refreshToken = this.jwtService.sign({ ...payload, tokenUse: 'refresh' }, {
+      secret: jwtSecret(),
       expiresIn: '30d'
     });
 
@@ -59,13 +60,13 @@ export class AuthService {
 
     const payload = { username: user.username, sub: user._id, profileType: user.profileType, access: user.access };
 
-    const newAccessToken = this.jwtService.sign(payload, {
-      secret: 'S3CR370',
+    const newAccessToken = this.jwtService.sign({ ...payload, tokenUse: 'access' }, {
+      secret: jwtSecret(),
       expiresIn: '1h'
     });
 
-    // const newRefreshToken = this.jwtService.sign(payload, {
-    //   secret: 'S3CR370',
+    // const newRefreshToken = this.jwtService.sign({ ...payload, tokenUse: 'access' }, {
+    //   secret: jwtSecret(),
     //   expiresIn: '30d'
     // });
 
@@ -80,6 +81,7 @@ export class AuthService {
   async register(username: string, password: string, email: string, profileType: string) {
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = new this.userModel({ username, password: hashedPassword, email, profileType });
-    return newUser.save();
+    await newUser.save();
+    return { _id: newUser._id, username: newUser.username };
   }
 }

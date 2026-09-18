@@ -14,8 +14,8 @@ export class DashboardService {
   async getAllDashboards() {
     try {
       const dashboard = await this.dashboardModel
-        .find()
-        .populate('sections', 'keyname name show')
+        .find({ deletedAt: null })
+        .populate({ path: 'sections', select: 'keyname name show workspaceId', match: { deletedAt: null } })
         .exec();
 
       return dashboard;
@@ -47,7 +47,7 @@ export class DashboardService {
 
       if (Object.keys(updateData).length > 0) {
         const editedDashboard = await this.dashboardModel.findOneAndUpdate(
-          { _id: dashboardId },
+          { _id: dashboardId, deletedAt: null },
           { $set: updateData },
           { new: true }
         );
@@ -65,15 +65,15 @@ export class DashboardService {
     try {
       const objectIds = sections.map(id => new mongoose.Types.ObjectId(id));
 
-      const updatedDashboard = await this.dashboardModel.findByIdAndUpdate(
-        dashboardId,
+      const updatedDashboard = await this.dashboardModel.findOneAndUpdate(
+        { _id: dashboardId, deletedAt: null },
         { $set: { sections: objectIds } },
         { new: true }
       );
 
       return this.dashboardModel
         .findById(updatedDashboard._id)
-        .populate('sections', 'keyname name show');
+        .populate({ path: 'sections', select: 'keyname name show workspaceId', match: { deletedAt: null } });
     } catch (error) {
       console.error('Error al actualizar las secciones: ', error);
       throw error;

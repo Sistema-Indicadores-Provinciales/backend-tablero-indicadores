@@ -17,6 +17,12 @@ export class Dashboard {
   @Prop()
   icon: string;
 
+  @Prop()
+  generatedWorkspaceId?: string;
+
+  @Prop()
+  deletedAt?: Date;
+
   @Prop({
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Section' }],
     default: [],

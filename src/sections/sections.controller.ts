@@ -1,10 +1,16 @@
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/auth.guard';
+import { AdminGuard } from '../auth/admin.guard';
 import { Controller, Get, Post, Body, Param, HttpException, HttpStatus, Delete, Put } from '@nestjs/common';
 import { SectionsService } from './sections.service';
+import { DashboardLifecycleService } from '../dashboard/dashboard-lifecycle.service';
 
+@UseGuards(JwtAuthGuard)
 @Controller('sections')
 export class SectionsController {
-  constructor(private readonly sectionsService: SectionsService) {}
+  constructor(private readonly sectionsService: SectionsService, private readonly lifecycle: DashboardLifecycleService) {}
 
+  @UseGuards(AdminGuard)
   @Post('add')
   async createSection(@Body() body: any) {
     const { keyname, name, show } = body;
@@ -16,6 +22,7 @@ export class SectionsController {
     return await this.sectionsService.getAllSections();
   }
 
+  @UseGuards(AdminGuard)
   @Put('edit/:sectionId')
   async editSection(
     @Param('sectionId') sectionId: string,
@@ -31,12 +38,13 @@ export class SectionsController {
     return this.sectionsService.editSection(sectionId, newKeyname, newName, show);
   }
 
+  @UseGuards(AdminGuard)
   @Delete('delete/:sectionId')
   async deleteSection(@Param('sectionId') sectionId: string) {
     try {
-      return await this.sectionsService.deleteSection(sectionId);
+      return await this.lifecycle.deleteSection(sectionId);
     } catch (error) {
-      throw new HttpException('Error eliminando la sección', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(error.message || 'Error eliminando la sección', error.status || HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }
