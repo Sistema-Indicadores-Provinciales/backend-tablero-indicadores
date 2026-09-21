@@ -15,10 +15,20 @@ async function bootstrap() {
   // Aplica el filtro globalmente para manejar excepciones
   app.useGlobalFilters(new ResponseFilter());
 
-  const allowedOrigins = [
+  const localOrigins = [
     'http://localhost:5173',
     'http://localhost:4173',
   ];
+
+  const configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  const allowedOrigins = new Set([
+    ...localOrigins,
+    ...configuredOrigins,
+  ]);
 
   const allowedSubnet = process.env.CORS_ALLOWED_SUBNET;
 
@@ -26,14 +36,14 @@ async function bootstrap() {
     origin: (origin, callback) => {
       const isAllowed =
         !origin ||
-        allowedOrigins.includes(origin) ||
-        (
+        allowedOrigins.has(origin) ||
+        Boolean(
           allowedSubnet &&
-          origin.startsWith(`http://${allowedSubnet}.`)
+          origin.startsWith(`http://${allowedSubnet}.`),
         );
 
       callback(
-        isAllowed ? null : new Error('Not allowed by CORS'),
+        isAllowed ? null : new Error(`Origin ${origin} not allowed by CORS`),
         isAllowed,
       );
     },
