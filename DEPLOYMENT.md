@@ -3,6 +3,8 @@
 Ramas: backend `feat/arreglo-users`; frontend `feat/arreglo-componentes`.
 Ubicar los repositorios como carpetas hermanas. No es necesario publicar todavía.
 
+Para la primera prueba en Railway, seguir [RAILWAY.md](RAILWAY.md): incluye los tres servicios, las ramas, las variables y el volumen de archivos.
+
 ## Desarrollo
 
 1. En backend, `npm ci` y configurar `.env` con `MONGODB_URL`, `JWT_SECRET`, `PORT=3000`, `CORS_ORIGINS=http://localhost:5173`.
