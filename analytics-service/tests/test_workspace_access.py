@@ -165,8 +165,8 @@ class WorkspaceAccessTests(unittest.TestCase):
         self.assertEqual(denied.status_code, 403)
         self.assertEqual(self.db.analytics_settings.find_one()['client_id'], client_id)
 
-    def test_google_configuration_rejects_secrets_and_invalid_client_ids(self):
-        for body in [{'client_id': 'secret'}, {'client_id': '123.apps.googleusercontent.com', 'client_secret': 'not-allowed'}]:
+    def test_google_configuration_rejects_unknown_fields_and_invalid_client_ids(self):
+        for body in [{'client_id': 'secret'}, {'client_id': '123.apps.googleusercontent.com', 'access_token': 'not-allowed'}]:
             self.assertEqual(self.client.put('/v2/google/settings', headers=self.headers(self.owner), json=body).status_code, 422)
         self.assertEqual(self.db.analytics_settings.count_documents({}), 0)
 

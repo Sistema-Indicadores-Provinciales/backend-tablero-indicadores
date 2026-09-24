@@ -197,6 +197,34 @@ def table(rows, header=1, decimal=",", types=None):
         meta[col] = {"type": kind, "unique_values": unique[:100], "unique_count": len(unique), "missing": sum(v is None for v in converted), "invalid": invalid}
     return frame, {"columns": names, "column_meta": meta, "row_count": len(frame), "preview": [{c: safe(v) for c, v in row.items()} for row in frame.head(20).to_dict("records")], "warnings": warnings}
 
+def filter_value(value):
+    value = safe(value)
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def filter_frame(frame, filters):
+    for col, values in filters.items():
+        if col not in frame or not isinstance(values, list):
+            raise DataError("Filtro no válido.")
+        if values:
+            sample = next((safe(v) for v in frame[col] if safe(v) is not None), None)
+            selected = [str(v) for v in values]
+            if isinstance(sample, (int, float)) and not isinstance(sample, bool):
+                def numeric_key(value):
+                    try:
+                        parsed = float(value)
+                        return filter_value(parsed) if math.isfinite(parsed) else value
+                    except (ValueError, TypeError, OverflowError):
+                        return value
+                selected = [numeric_key(v) for v in selected]
+            elif isinstance(sample, bool):
+                selected = [{'true': 'True', 'false': 'False'}.get(v.lower(), v) for v in selected]
+            frame = frame[frame[col].map(filter_value).isin(selected)]
+    return frame
+
+
 def chart(frame, cfg):
     kind = cfg.get("chart_type", "bar")
     agg = cfg.get("aggregation", "sum")
@@ -207,11 +235,7 @@ def chart(frame, cfg):
     if any(c not in frame for c in required):
         raise DataError("Elegí columnas válidas para este gráfico.")
     frame = frame.copy()
-    for col, values in cfg.get("filters", {}).items():
-        if col not in frame or not isinstance(values, list):
-            raise DataError("Filtro no válido.")
-        if values:
-            frame = frame[frame[col].map(lambda v: str(safe(v))).isin([str(v) for v in values])]
+    frame = filter_frame(frame, cfg.get("filters", {}))
     rows = len(frame)
     warnings = []
     if kind == "table":

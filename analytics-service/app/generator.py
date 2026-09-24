@@ -13,12 +13,14 @@ import httpx
 import jwt
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, SecretStr
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from starlette.concurrency import run_in_threadpool
 
-from app.data_engine import DataError, read_rows, bounded, table, chart, MAX_ROWS, MAX_COLS
+from app.data_engine import DataError, read_rows, bounded, table, chart, filter_frame, filter_value, MAX_ROWS, MAX_COLS
+from app import google_oauth
+from app.cors_origins import cors_origins
 from app.workspace_access import current_user, owned_workspace, ensure_menu, publication_options, publish, view_workspace
 from app.section_access import (create_section, section_options, require_admin, dashboard_for,
                                 validate_destination, target_section)
@@ -154,14 +156,13 @@ def google_get(source, token, range_name=None):
 
 @router.get("/google/status")
 def google_status(owner=Depends(user)):
-    settings = db().analytics_settings.find_one({"_id": "google-sheets"}) or {}
-    return {"client_id": settings.get("client_id") or os.getenv("GOOGLE_CLIENT_ID", "").strip(),
-            "public_access": True}
+    return google_oauth.status(db(), owner)
 
 
 class GoogleSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     client_id: str = Field(max_length=250, pattern=r"^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$")
+    client_secret: SecretStr | None = None
 
 
 @router.put("/google/settings")
@@ -169,11 +170,44 @@ def save_google_settings(config: GoogleSettings, owner=Depends(user)):
     account = current_user(db(), owner)
     if account.get("profileType") != "ADMIN":
         raise HTTPException(403, "Solo un administrador puede configurar la conexión con Google.")
-    # A web OAuth client ID is public. Never accept client secrets or user tokens here.
-    db().analytics_settings.update_one({"_id": "google-sheets"}, {"$set": {
+    previous = db().analytics_settings.find_one({"_id": "google-sheets"}) or {}
+    update = {
         "client_id": config.client_id, "updated_by": owner, "updated_at": datetime.now(timezone.utc),
-    }}, upsert=True)
+    }
+    secret = config.client_secret.get_secret_value().strip() if config.client_secret else ""
+    if secret:
+        if not 10 <= len(secret) <= 4000:
+            raise HTTPException(422, "Revisá el secreto del cliente de Google.")
+        update["client_secret"] = google_oauth.seal(secret, "client:" + config.client_id)
+    elif previous.get("client_id") != config.client_id:
+        update["client_secret"] = None
+    db().analytics_settings.update_one({"_id": "google-sheets"}, {"$set": update}, upsert=True)
     return google_status(owner)
+
+
+class GoogleCode(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    code: SecretStr
+    client_id: str = Field(max_length=250)
+
+
+@router.post("/google/connect")
+def persist_google_connection(body: GoogleCode, owner=Depends(user), origin: str = Header(default=""),
+                              x_requested_with: str = Header(default="")):
+    # Popup authorization codes are bound to the page origin. Never accept an arbitrary redirect URI.
+    if origin not in cors_origins() or x_requested_with != "XMLHttpRequest":
+        raise HTTPException(403, "El origen de la conexión Google no está autorizado.")
+    if body.client_id != google_oauth.credentials(db())[0]:
+        raise HTTPException(409, "La configuración de Google cambió. Actualizá la página.")
+    code = body.code.get_secret_value()
+    if not code or len(code) > 4096:
+        raise HTTPException(422, "El código de Google no es válido.")
+    return google_oauth.connect(db(), owner, code, origin)
+
+
+@router.delete("/google/connection")
+def remove_google_connection(owner=Depends(user)):
+    return google_oauth.disconnect(db(), owner)
 
 
 @router.post("/sources/google")
@@ -183,8 +217,11 @@ def connect_google(body: GoogleSource, owner=Depends(user), x_google_access_toke
         read_public_rows(candidate)
         public_access = True
     except HTTPException as exc:
-        if exc.status_code != 409 or candidate.get("published_id") or not (x_google_access_token or os.getenv("GOOGLE_SHEETS_API_KEY", "").strip()):
+        if exc.status_code != 409 or candidate.get("published_id"):
             raise
+        x_google_access_token = x_google_access_token or google_oauth.access_token(db(), owner)
+        if not (x_google_access_token or os.getenv("GOOGLE_SHEETS_API_KEY", "").strip()):
+            raise exc
         public_access = False
     if public_access:
         doc = {"_id": uuid4().hex, "owner": owner, "kind": "google", "access_mode": "public",
@@ -192,7 +229,7 @@ def connect_google(body: GoogleSource, owner=Depends(user), x_google_access_toke
     else:
         info = google_get(candidate, x_google_access_token)
         doc = {"_id": uuid4().hex, "owner": owner, "kind": "google", "name": info.get("properties", {}).get("title", body.name), "spreadsheet_id": candidate["spreadsheet_id"], "sheets": [s["properties"]["title"] for s in info.get("sheets", [])]}
-    # Google tokens are deliberately never persisted or logged.
+    # Source documents never contain Google credentials; grants belong to the requesting user.
     db().analytics_sources.insert_one(doc)
     return public(doc)
 
@@ -202,7 +239,7 @@ def sheets(source_id: str, owner=Depends(user), x_google_access_token: str = Hea
     if doc["kind"] == "google":
         if doc.get("access_mode") == "public":
             return [SHEET_NAME]
-        info = google_get(doc, x_google_access_token)
+        info = google_get(doc, x_google_access_token or google_oauth.access_token(db(), owner))
         return [s["properties"]["title"] for s in info.get("sheets", [])]
     return read_rows(local_path(doc))
 
@@ -224,6 +261,8 @@ class ChartConfig(ReadConfig):
 
 def load_table(source_id, owner, config, google_token):
     doc = source_for(source_id, owner)
+    if doc["kind"] == "google" and doc.get("access_mode") != "public":
+        google_token = google_token or google_oauth.access_token(db(), owner)
     return table_from_source(doc, config, google_token)
 
 def table_from_source(doc, config, google_token):
@@ -397,14 +436,44 @@ def workspace_view(workspace_id: str, owner=Depends(user)):
 
 @router.get("/workspaces/{workspace_id}/widgets/{widget_id}/chart")
 def saved_chart(workspace_id: str, widget_id: str, owner=Depends(user), x_google_access_token: str = Header(default="")):
+    return render_saved_chart(workspace_id, widget_id, owner, x_google_access_token, {})
+
+
+class ViewFilters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    filters: dict[str, list[str]] = Field(default_factory=dict, max_length=MAX_COLS)
+
+
+@router.post("/workspaces/{workspace_id}/widgets/{widget_id}/chart")
+def filtered_saved_chart(workspace_id: str, widget_id: str, body: ViewFilters, owner=Depends(user),
+                         x_google_access_token: str = Header(default="")):
+    if any(len(key) > 500 or len(values) > 100 or any(len(v) > 2000 for v in values) for key, values in body.filters.items()):
+        raise HTTPException(422, "La selección de filtros es demasiado extensa.")
+    return render_saved_chart(workspace_id, widget_id, owner, x_google_access_token, body.filters)
+
+
+def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
     workspace = view_workspace(db(), workspace_id, owner)
     widget = next((w for w in workspace["widgets"] if w["id"] == widget_id), None)
     if widget is None:
         raise HTTPException(404, "Este gráfico ya no forma parte del tablero. Actualizá la página.")
-    # Only the persisted configuration is allowed; viewers cannot query the private source freely.
+    # Only additional filters are accepted. A viewer cannot change the chart, sheet or saved restrictions.
     source = source_for(workspace["source_id"], workspace["owner"])
     config = ChartConfig.model_validate(widget["config"])
-    frame, metadata = table_from_source(source, config, x_google_access_token)
-    result = chart(frame, config.model_dump())
+    if source["kind"] == "google" and source.get("access_mode") != "public":
+        google_token = google_token or google_oauth.access_token(db(), owner)
+    frame, metadata = table_from_source(source, config, google_token)
+    frame = filter_frame(frame, config.filters)
+    allowed = set(frame.columns) if config.chart_type == "table" else set([config.x_col, config.y_col, config.group_col, *config.filters])
+    if any(column not in allowed for column in filters):
+        raise HTTPException(422, "Solo podés filtrar por los campos de este gráfico.")
+    options = {}
+    for column in frame.columns:
+        if column not in allowed:
+            continue
+        values = list(dict.fromkeys(filter_value(v) for v in frame[column]))
+        options[column] = {"values": values[:100], "total": len(values)}
+    result = chart(frame, {**config.model_dump(), "filters": filters})
+    result["filter_options"] = options
     result["warnings"] = metadata["warnings"] + result.get("warnings", [])
     return result

@@ -117,12 +117,12 @@ En **web → Variables**, agregar:
 
 ```dotenv
 PORT=80
-API_UPSTREAM=backend.railway.internal:3000
-ANALYTICS_UPSTREAM=analytics.railway.internal:8000
+API_UPSTREAM=${{backend.RAILWAY_PRIVATE_DOMAIN}}:3000
+ANALYTICS_UPSTREAM=${{analytics.RAILWAY_PRIVATE_DOMAIN}}:8000
 TRUST_PROXY_HEADERS=1
 ```
 
-Las direcciones de los dos servicios no llevan `http://` ni una barra final. Si les dieron otros nombres, usar las direcciones que muestra Railway en **Private Networking**.
+Pegar las referencias literalmente; usan el dominio privado real, que puede conservar un nombre anterior del servicio. No llevan `http://` ni una barra final. Si los servicios tienen otros nombres, ajustar la referencia o usar las direcciones que muestra Railway en **Private Networking**.
 
 `TRUST_PROXY_HEADERS=1` se usa porque Railway entrega la IP del visitante y el protocolo HTTPS mediante sus cabeceras. Así los visitantes no comparten todos un mismo límite de solicitudes por la IP del proxy. En Docker Compose se conserva el valor predeterminado `0`.
 
@@ -164,7 +164,9 @@ Los healthchecks verifican que los procesos respondan. El de analytics no prueba
 6. Reiniciar únicamente `analytics` y comprobar que el Excel subido sigue abriendo: esto verifica el volumen.
 7. Cerrar y volver a abrir sesión, y verificar que no aparecen errores de CORS ni peticiones a `localhost`.
 
-Para Sheets privados, abrir **Administración → Conexiones**, configurar el ID del cliente OAuth y agregar el dominio HTTPS de Railway a los orígenes JavaScript autorizados de ese cliente en Google. En modo de prueba de Google, agregar las cuentas que participarán. La conexión real queda por validar con una cuenta autorizada.
+Para Sheets privados, abrir **Administración → Conexiones**, configurar el ID y el secreto del mismo cliente OAuth y agregar el dominio HTTPS de Railway a los orígenes JavaScript autorizados de ese cliente en Google. Cada usuario debe conectar Google una vez después de habilitar la conexión persistente; luego queda asociada a su usuario y se renueva desde analytics. No poner el secreto en variables VITE. El cifrado usa una clave derivada del JWT_SECRET ya configurado (debe tener al menos 32 caracteres); se puede definir GOOGLE_TOKEN_ENCRYPTION_KEY antes de guardar credenciales, según DEPLOYMENT.md.
+
+En modo de prueba de Google, agregar las cuentas que participarán y tener presente que Google vence las autorizaciones a los 7 días. Publicar la web en Railway no cambia el estado Testing del proyecto Google. Validar en el despliegue: conectar, abrir sección, recargar, salir e ingresar con el mismo usuario, cambiar de usuario y desconectar.
 
 ## 9. Excel ya subidos en tu computadora
 
@@ -184,6 +186,8 @@ Fuentes: [planes y precios](https://docs.railway.com/pricing/plans), [limitacion
 
 | Mensaje o síntoma | Revisar |
 | --- | --- |
+| `$PORT` no es un entero / no se encuentra `npm` al arrancar frontend | Dejar Custom Start Command vacío y usar el comando del Dockerfile. Puertos: backend 3000, analytics 8000, frontend 80 |
+| `railway.internal could not be resolved` | Usar las referencias RAILWAY_PRIVATE_DOMAIN de arriba y el mismo entorno; no inferir el dominio a partir del nombre visible |
 | No aparecen los repositorios | Permiso de la integración de Railway en la organización GitHub |
 | Web responde, pero login devuelve 502 | Nombres privados, puerto 3000 y estado de `backend` |
 | Generador devuelve 502 | Nombre privado, puerto 8000 y estado de `analytics` |

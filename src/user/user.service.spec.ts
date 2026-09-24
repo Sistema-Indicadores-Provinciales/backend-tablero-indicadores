@@ -47,3 +47,14 @@ test('disabling the generated dashboard or its only accessible section hides it'
   generated.sections[0].show = false;
   expect((await service.getMyDashboards('user')).map(d => d.keyname)).toEqual(['economia']);
 });
+
+test('deleting a user also removes their stored Google authorization', async () => {
+  const id = new Types.ObjectId();
+  const removeGrant = jest.fn().mockResolvedValue({ deletedCount: 1 });
+  const collection = jest.fn().mockReturnValue({ deleteOne: removeGrant });
+  const users = { findOneAndDelete: jest.fn().mockResolvedValue({ _id: id }), db: { collection } };
+  const service = new UserService(users as any, {} as any);
+  await service.deleteUser('Ana', 'ana@example.test');
+  expect(collection).toHaveBeenCalledWith('analytics_google_connections');
+  expect(removeGrant).toHaveBeenCalledWith({ _id: id.toString() });
+});

@@ -8,6 +8,7 @@ import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 
 from app.generator import router, user, UPLOADS, MAX_BYTES
 from app.data_engine import DataError, safe
@@ -28,6 +29,13 @@ app = FastAPI(
 )
 
 app.include_router(router)
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request: Request, exc: RequestValidationError):
+    # Validation responses must never echo OAuth codes or client secrets.
+    return JSONResponse(status_code=422, content={"detail": [
+        {"loc": list(error["loc"]), "msg": error["msg"], "type": error["type"]} for error in exc.errors()
+    ]})
 
 @app.exception_handler(DataError)
 async def data_error(request: Request, exc: DataError):

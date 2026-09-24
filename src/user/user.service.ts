@@ -28,6 +28,7 @@ export class UserService {
     if (!user) {
       throw new Error('Usuario no encontrado.');
     }
+    await this.userModel.db.collection('analytics_google_connections').deleteOne({ _id: user._id.toString() as any });
     return { message: 'Usuario eliminado correctamente.' };
   }
 
