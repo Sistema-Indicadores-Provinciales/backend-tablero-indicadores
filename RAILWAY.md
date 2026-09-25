@@ -172,6 +172,8 @@ En modo de prueba de Google, agregar las cuentas que participarán y tener prese
 
 Los archivos del generador están en `backend-tablero-indicadores/analytics-service/storage` o en la carpeta que indique `ANALYTICS_STORAGE` local. No viajan con GitHub. Copiar MongoDB tampoco copia esos archivos.
 
+La lista **Archivos disponibles** comprueba que los archivos existan y se puedan abrir en el servidor actual. Los ausentes no se ofrecen como opciones, pero se conservan sus registros y los tableros que los usan. Al editar uno de esos tableros, el generador avisa y permite subir un reemplazo o elegir otra fuente; conserva la configuración y los filtros para revisarlos antes de guardar. Si se recupera el volumen original, **Actualizar lista** vuelve a mostrar los archivos. Las hojas de Google se mantienen en la lista: su acceso se verifica al utilizarlas.
+
 Para una prueba desde cero, subir nuevos archivos por el generador. Para abrir configuraciones anteriores, copiar también los archivos originales al volumen `/app/storage`, conservando sus nombres. Railway permite administrar ese volumen con `railway volume browse` o `railway volume files`; seleccionar antes el proyecto, entorno y servicio `analytics` de la prueba. Los archivos precargados bajo `analytics-service/data` sí se incluyen en la imagen.
 
 ## Costos y límites de esta primera prueba

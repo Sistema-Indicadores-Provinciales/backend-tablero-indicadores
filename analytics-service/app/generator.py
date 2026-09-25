@@ -66,11 +66,17 @@ def source_for(source_id, owner):
     return doc
 
 def local_path(doc):
-    base = SYSTEM if doc["kind"] == "system" else UPLOADS
-    path = (base / doc["path"]).resolve()
-    if not path.is_relative_to(base) or not path.is_file():
-        raise HTTPException(404, "El archivo no está disponible en este servidor. Revisá el volumen de datos o volvé a subirlo.")
-    return path
+    base = SYSTEM if doc.get("kind") == "system" else UPLOADS
+    try:
+        relative = doc.get("path")
+        if isinstance(relative, str) and relative:
+            path = (base / relative).resolve()
+            if path.is_relative_to(base) and path.is_file():
+                with path.open("rb"):
+                    return path
+    except (OSError, ValueError, RuntimeError):
+        pass
+    raise HTTPException(404, "El archivo no está disponible en este servidor. Volvé a subirlo o elegí otra fuente de datos.")
 
 @router.get("/sources")
 def sources(owner=Depends(user)):
@@ -78,7 +84,20 @@ def sources(owner=Depends(user)):
         if path.is_file() and path.suffix.lower() in {".xlsx", ".xls", ".xlsm", ".csv", ".tsv"}:
             relative = path.relative_to(SYSTEM).as_posix()
             db().analytics_sources.update_one({"_id": "system-" + hashlib.sha256(relative.encode()).hexdigest()[:24]}, {"$setOnInsert": {"name": path.name, "kind": "system", "path": relative}}, upsert=True)
-    return [public(d) for d in db().analytics_sources.find({"$or": [{"owner": owner}, {"kind": "system"}]}).limit(500)]
+    available = []
+    for doc in db().analytics_sources.find({"$or": [{"owner": owner}, {"kind": "system"}]}):
+        if doc.get("kind") != "google":
+            try:
+                local_path(doc)
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                # Keep metadata and saved dashboards intact if a volume is temporarily absent.
+                continue
+        available.append(public(doc))
+        if len(available) == 500:
+            break
+    return available
 
 @router.post("/sources/upload")
 async def upload(file: UploadFile = File(...), owner=Depends(user)):
