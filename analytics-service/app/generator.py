@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 from uuid import UUID, uuid4
 from urllib.parse import urlparse, quote
 
@@ -332,6 +333,7 @@ class Workspace(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     source_id: str = Field(max_length=500)
     widgets: list[Widget] = Field(max_length=30)
+    filter_columns: list[Annotated[str, Field(min_length=1, max_length=500)]] | None = Field(default=None, max_length=20)
     destination: Destination | None = None
 
 @router.get("/workspaces")
@@ -483,16 +485,26 @@ def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
         google_token = google_token or google_oauth.access_token(db(), owner)
     frame, metadata = table_from_source(source, config, google_token)
     frame = filter_frame(frame, config.filters)
-    allowed = set(frame.columns) if config.chart_type == "table" else set([config.x_col, config.y_col, config.group_col, *config.filters])
+    configured_columns = workspace.get("filter_columns")
+    if configured_columns is not None:
+        allowed = set(configured_columns)
+    else:
+        # Older sections share their existing chart fields until the author chooses the controls.
+        allowed = set(frame.columns) if config.chart_type == "table" else set()
+        for saved in workspace["widgets"]:
+            cfg = saved["config"]
+            allowed.update([cfg.get("x_col", ""), cfg.get("y_col", ""), cfg.get("group_col", ""), *cfg.get("filters", {})])
     if any(column not in allowed for column in filters):
-        raise HTTPException(422, "Solo podés filtrar por los campos de este gráfico.")
+        raise HTTPException(422, "Solo podés filtrar por los campos habilitados en esta sección.")
     options = {}
     for column in frame.columns:
         if column not in allowed:
             continue
         values = list(dict.fromkeys(filter_value(v) for v in frame[column]))
-        options[column] = {"values": values[:100], "total": len(values)}
-    result = chart(frame, {**config.model_dump(), "filters": filters})
+        options[column] = {"values": values[:100], "total": len(values), "type": metadata["column_meta"][column]["type"]}
+    applicable = {column: values for column, values in filters.items() if column in frame.columns}
+    result = chart(frame, {**config.model_dump(), "filters": applicable})
     result["filter_options"] = options
+    result["ignored_filters"] = [column for column, values in filters.items() if values and column not in frame.columns]
     result["warnings"] = metadata["warnings"] + result.get("warnings", [])
     return result
