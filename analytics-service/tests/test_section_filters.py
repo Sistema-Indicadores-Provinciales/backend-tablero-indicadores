@@ -56,6 +56,45 @@ class SectionFilterTests(unittest.TestCase):
         self.assertEqual(self.query().json()['filter_options'], {})
         self.assertEqual(self.query(filters={'Año': ['2026']}).status_code, 422)
 
+    def test_options_follow_other_filters_but_not_their_own_selection(self):
+        # January has only Individual; February also has Grupal. The 2025 row
+        # must remain excluded even when the reader clears every filter.
+        self.rows[:] = [['Año', 'Mes', 'Tipo', 'Total'], [2026, 'Enero', 'Individual', 10],
+                        [2026, 'Febrero', 'Grupal', 20], [2026, 'Febrero', 'Individual', 5],
+                        [2025, 'Enero', 'Grupal', 99]]
+        for widget in self.widgets:
+            body = self.query(widget['id'], {'Mes': ['Enero']}).json()
+            self.assertEqual(body['filter_options']['Tipo']['values'], ['Individual'])
+            self.assertEqual(body['filter_options']['Mes']['values'], ['Enero', 'Febrero'])
+            self.assertEqual(body['filter_options']['Tipo']['unfiltered_total'], 2)
+            self.assertEqual(body['datasets'][0]['data'], [10])
+        options = self.query(filters={'Mes': ['Enero', 'Febrero'], 'Tipo': ['Individual']}).json()['filter_options']
+        self.assertEqual(options['Tipo']['values'], ['Individual', 'Grupal'])
+        self.assertEqual(options['Tipo']['available_selected'], ['Individual'])
+        self.assertEqual(options['Mes']['values'], ['Enero', 'Febrero'])
+        self.assertEqual(options['Mes']['available_selected'], ['Enero', 'Febrero'])
+        self.assertEqual(self.query().json()['filter_options']['Tipo']['values'], ['Individual', 'Grupal'])
+
+    def test_incompatible_selections_have_recovery_options_without_broadening_results(self):
+        original = copy.deepcopy(self.db.analytics_workspaces.find_one())
+        # A is only available in January, so these two selections conflict.
+        body = self.query(filters={'Mes': ['Febrero'], 'Tipo': ['A']}).json()
+        self.assertEqual(body['filtered_rows'], 0)
+        self.assertEqual(body['filter_options']['Tipo']['values'], ['B'])
+        self.assertEqual(body['filter_options']['Tipo']['available_selected'], [])
+        self.assertEqual(body['filter_options']['Mes']['values'], ['Enero'])
+        self.assertEqual(body['filter_options']['Mes']['available_selected'], [])
+        self.assertEqual(self.db.analytics_workspaces.find_one(), original)
+
+    def test_empty_saved_subset_has_no_suggestions_even_with_no_viewer_filters(self):
+        self.db.analytics_workspaces.update_one({}, {'$set': {'widgets.1.config.filters': {'Año': ['1999']}}})
+        body = self.query(filters={'Tipo': ['A']}).json()
+        self.assertEqual(body['filtered_rows'], 0)
+        for option in body['filter_options'].values():
+            self.assertEqual(option['values'], [])
+            self.assertEqual(option['total'], 0)
+            self.assertEqual(option['available_selected'], [])
+
     def test_incompatible_columns_are_reported_and_other_filters_still_apply(self):
         self.db.analytics_workspaces.update_one({}, {'$set': {'widgets.1.config': {
             'sheet': 'Otra', 'chart_type': 'indicator', 'x_col': 'Total', 'y_col': 'Total', 'aggregation': 'sum', 'filters': {},

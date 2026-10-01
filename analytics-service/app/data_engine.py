@@ -204,25 +204,49 @@ def filter_value(value):
     return str(value)
 
 
+def filter_keys(series, values):
+    sample = next((safe(v) for v in series if safe(v) is not None), None)
+    selected = [str(v) for v in values]
+    if isinstance(sample, (int, float)) and not isinstance(sample, bool):
+        def numeric_key(value):
+            try:
+                parsed = float(value)
+                return filter_value(parsed) if math.isfinite(parsed) else value
+            except (ValueError, TypeError, OverflowError):
+                return value
+        selected = [numeric_key(v) for v in selected]
+    elif isinstance(sample, bool):
+        selected = [{'true': 'True', 'false': 'False'}.get(v.lower(), v) for v in selected]
+    return series.map(filter_value), selected
+
+
 def filter_frame(frame, filters):
     for col, values in filters.items():
         if col not in frame or not isinstance(values, list):
             raise DataError("Filtro no válido.")
         if values:
-            sample = next((safe(v) for v in frame[col] if safe(v) is not None), None)
-            selected = [str(v) for v in values]
-            if isinstance(sample, (int, float)) and not isinstance(sample, bool):
-                def numeric_key(value):
-                    try:
-                        parsed = float(value)
-                        return filter_value(parsed) if math.isfinite(parsed) else value
-                    except (ValueError, TypeError, OverflowError):
-                        return value
-                selected = [numeric_key(v) for v in selected]
-            elif isinstance(sample, bool):
-                selected = [{'true': 'True', 'false': 'False'}.get(v.lower(), v) for v in selected]
-            frame = frame[frame[col].map(filter_value).isin(selected)]
+            keys, selected = filter_keys(frame[col], values)
+            frame = frame[keys.isin(selected)]
     return frame
+
+
+def contextual_filter_options(frame, columns, filters):
+    # Normalize once per column. Counting failed conditions lets each facet exclude
+    # its own selection without refiltering/downloading the table for every field.
+    keyed = {col: filter_keys(frame[col], filters.get(col, [])) for col in frame.columns if col in columns}
+    misses = {col: (~keys.isin(selected)).astype('int16') for col, (keys, selected) in keyed.items() if selected}
+    failures = sum(misses.values()) if misses else None
+    options = {}
+    for col, (keys, selected) in keyed.items():
+        visible = keys if failures is None else keys[(failures - misses.get(col, 0)) == 0]
+        values = list(dict.fromkeys(visible))
+        available = set(values)
+        options[col] = {
+            'values': values[:100], 'total': len(values), 'unfiltered_total': keys.nunique(),
+            # Validate selected values against the whole facet, beyond the 100 suggestions.
+            'available_selected': [value for value, key in zip(filters.get(col, []), selected) if key in available],
+        }
+    return options
 
 
 def chart(frame, cfg):

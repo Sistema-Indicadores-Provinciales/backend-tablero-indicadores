@@ -25,7 +25,7 @@ from app.excel_utils import get_excel_sheets, read_excel_data
 app = FastAPI(
     title="Excel Analytics Service",
     description="Microservicio para carga, lectura y análisis de archivos Excel.",
-    version="1.3.0",
+    version="1.4.0",
 )
 
 app.include_router(router)

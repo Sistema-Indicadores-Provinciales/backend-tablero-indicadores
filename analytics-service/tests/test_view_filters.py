@@ -50,11 +50,28 @@ class ViewFilterTests(unittest.TestCase):
             self.assertEqual(response.json()['datasets'][0]['data'], [119])
             self.assertEqual(response.json()['filter_options']['x']['total'], 121)
             self.assertEqual(len(response.json()['filter_options']['x']['values']), 100)
+            self.assertEqual(response.json()['filter_options']['x']['available_selected'], ['Value 119'])
+            self.assertEqual(response.json()['filter_options']['y']['values'], ['119'])
+            narrowed = self.filtered({'x': ['Value 119'], 'y': ['0']}).json()
+            self.assertEqual(narrowed['filter_options']['x']['available_selected'], [])
+            self.assertEqual(narrowed['filter_options']['x']['values'], ['Value 0', 'None'])
             self.assertEqual(self.filtered({'x': ['None']}).json()['filtered_rows'], 1)
         for value, types, selected in [(True, {}, 'True'), ('2026-09-24', {'x': 'date'}, '2026-09-24T00:00:00')]:
             self.db.analytics_workspaces.update_one({}, {'$set': {'widgets.0.config.types': types}})
             with patch.object(api, 'read_rows', return_value=[['x', 'y'], [value, 10]]), patch.object(api, 'local_path', return_value='unused'):
                 self.assertEqual(self.filtered({'x': [selected]}).json()['filtered_rows'], 1)
+
+    def test_contextual_options_keep_numeric_boolean_and_null_filter_equivalence(self):
+        self.publish([self.owner, self.viewer])
+        self.db.analytics_workspaces.update_one({}, {'$set': {'widgets.0.config.filters': {}, 'filter_columns': ['x', 'y', 'flag']}})
+        rows = [['x', 'y', 'flag'], ['A', 2026, True], ['B', 2025, False], [None, 2026, True]]
+        with patch.object(api, 'read_rows', return_value=rows), patch.object(api, 'local_path', return_value='unused'):
+            body = self.filtered({'y': ['2026.0'], 'flag': ['true'], 'x': ['None']}).json()
+            self.assertEqual(body['filtered_rows'], 1)
+            self.assertEqual(body['filter_options']['x']['values'], ['A', 'None'])
+            self.assertEqual(body['filter_options']['x']['available_selected'], ['None'])
+            self.assertEqual(body['filter_options']['y']['available_selected'], ['2026.0'])
+            self.assertEqual(body['filter_options']['flag']['available_selected'], ['true'])
 
     def test_revoked_access_is_checked_before_reading_data_and_limits_are_enforced(self):
         self.publish([self.owner, self.viewer])

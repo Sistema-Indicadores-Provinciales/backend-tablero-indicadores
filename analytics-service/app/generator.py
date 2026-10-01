@@ -19,7 +19,7 @@ from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from starlette.concurrency import run_in_threadpool
 
-from app.data_engine import DataError, read_rows, bounded, table, chart, filter_frame, filter_value, MAX_ROWS, MAX_COLS
+from app.data_engine import DataError, read_rows, bounded, table, chart, filter_frame, contextual_filter_options, MAX_ROWS, MAX_COLS
 from app import google_oauth
 from app.cors_origins import cors_origins
 from app.workspace_access import current_user, owned_workspace, ensure_menu, publication_options, publish, view_workspace
@@ -496,13 +496,10 @@ def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
             allowed.update([cfg.get("x_col", ""), cfg.get("y_col", ""), cfg.get("group_col", ""), *cfg.get("filters", {})])
     if any(column not in allowed for column in filters):
         raise HTTPException(422, "Solo podés filtrar por los campos habilitados en esta sección.")
-    options = {}
-    for column in frame.columns:
-        if column not in allowed:
-            continue
-        values = list(dict.fromkeys(filter_value(v) for v in frame[column]))
-        options[column] = {"values": values[:100], "total": len(values), "type": metadata["column_meta"][column]["type"]}
     applicable = {column: values for column, values in filters.items() if column in frame.columns}
+    options = contextual_filter_options(frame, allowed, applicable)
+    for column, option in options.items():
+        option['type'] = metadata['column_meta'][column]['type']
     result = chart(frame, {**config.model_dump(), "filters": applicable})
     result["filter_options"] = options
     result["ignored_filters"] = [column for column, values in filters.items() if values and column not in frame.columns]
