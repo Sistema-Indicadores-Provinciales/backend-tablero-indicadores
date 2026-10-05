@@ -220,6 +220,17 @@ def filter_keys(series, values):
     return series.map(filter_value), selected
 
 
+def filter_selection(selection):
+    """Normalize a legacy inclusion list or a bounded include/exclude selection."""
+    if isinstance(selection, list):
+        return "include", selection
+    if isinstance(selection, dict) and len(selection) == 1:
+        mode, values = next(iter(selection.items()))
+        if mode in {"include", "exclude"} and isinstance(values, list):
+            return mode, values
+    raise DataError("Filtro no válido.")
+
+
 def filter_frame(frame, filters):
     for col, values in filters.items():
         if col not in frame or not isinstance(values, list):
@@ -233,20 +244,42 @@ def filter_frame(frame, filters):
 def contextual_filter_options(frame, columns, filters):
     # Normalize once per column. Counting failed conditions lets each facet exclude
     # its own selection without refiltering/downloading the table for every field.
-    keyed = {col: filter_keys(frame[col], filters.get(col, [])) for col in frame.columns if col in columns}
-    misses = {col: (~keys.isin(selected)).astype('int16') for col, (keys, selected) in keyed.items() if selected}
+    keyed = {col: filter_keys(frame[col], filter_selection(filters.get(col, []))[1]) for col in frame.columns if col in columns}
+    misses = {}
+    for col, (keys, selected) in keyed.items():
+        mode, values = filter_selection(filters.get(col, []))
+        if not values:
+            continue
+        matches = keys.isin(selected)
+        misses[col] = (~matches if mode == "include" else matches).astype('int16')
     failures = sum(misses.values()) if misses else None
     options = {}
     for col, (keys, selected) in keyed.items():
         visible = keys if failures is None else keys[(failures - misses.get(col, 0)) == 0]
         values = list(dict.fromkeys(visible))
         available = set(values)
+        _, raw_selected = filter_selection(filters.get(col, []))
         options[col] = {
             'values': values[:100], 'total': len(values), 'unfiltered_total': keys.nunique(),
             # Validate selected values against the whole facet, beyond the 100 suggestions.
-            'available_selected': [value for value, key in zip(filters.get(col, []), selected) if key in available],
+            'available_selected': [value for value, key in zip(raw_selected, selected) if key in available],
         }
     return options
+
+
+def apply_view_filters(frame, filters):
+    """Apply section filters, preserving list-based inclusion requests."""
+    result = frame
+    for col, selection in filters.items():
+        if col not in result:
+            continue
+        mode, values = filter_selection(selection)
+        if not values:
+            continue
+        keys, selected = filter_keys(result[col], values)
+        matches = keys.isin(selected)
+        result = result[~matches if mode == "exclude" else matches]
+    return result
 
 
 def chart(frame, cfg):

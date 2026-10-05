@@ -61,6 +61,23 @@ class ViewFilterTests(unittest.TestCase):
             with patch.object(api, 'read_rows', return_value=[['x', 'y'], [value, 10]]), patch.object(api, 'local_path', return_value='unused'):
                 self.assertEqual(self.filtered({'x': [selected]}).json()['filtered_rows'], 1)
 
+    def test_exclusion_filters_keep_the_complement_and_the_field_options(self):
+        self.publish([self.owner, self.viewer])
+        config = {**self.workspace['widgets'][0]['config'], 'filters': {}, 'types': {'x': 'text'}}
+        self.db.analytics_workspaces.update_one({}, {'$set': {
+            'widgets.0.config': config, 'filter_columns': ['x', 'y'],
+        }})
+        rows = [['x', 'y']] + [[f'Value {i}', i] for i in range(120)]
+        with patch.object(api, 'read_rows', return_value=rows), patch.object(api, 'local_path', return_value='unused'):
+            response = self.filtered({'x': {'exclude': ['Value 119']}})
+            self.assertEqual(response.status_code, 200, response.text)
+            body = response.json()
+            self.assertEqual(body['filtered_rows'], 119)
+            self.assertEqual(body['filter_options']['x']['available_selected'], ['Value 119'])
+            self.assertEqual(body['filter_options']['x']['total'], 120)
+            self.assertEqual(body['filter_options']['y']['total'], 119)
+            self.assertEqual(body['filter_options']['y']['values'], [str(i) for i in range(100)])
+
     def test_contextual_options_keep_numeric_boolean_and_null_filter_equivalence(self):
         self.publish([self.owner, self.viewer])
         self.db.analytics_workspaces.update_one({}, {'$set': {'widgets.0.config.filters': {}, 'filter_columns': ['x', 'y', 'flag']}})

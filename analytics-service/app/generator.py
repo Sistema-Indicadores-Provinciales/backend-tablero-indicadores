@@ -19,7 +19,8 @@ from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from starlette.concurrency import run_in_threadpool
 
-from app.data_engine import DataError, read_rows, bounded, table, chart, filter_frame, contextual_filter_options, MAX_ROWS, MAX_COLS
+from app.data_engine import (DataError, read_rows, bounded, table, chart, filter_frame,
+                             filter_selection, apply_view_filters, contextual_filter_options, MAX_ROWS, MAX_COLS)
 from app import google_oauth
 from app.cors_origins import cors_origins
 from app.workspace_access import current_user, owned_workspace, ensure_menu, publication_options, publish, view_workspace
@@ -462,14 +463,16 @@ def saved_chart(workspace_id: str, widget_id: str, owner=Depends(user), x_google
 
 class ViewFilters(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    filters: dict[str, list[str]] = Field(default_factory=dict, max_length=MAX_COLS)
+    filters: dict[str, list[str] | dict[str, list[str]]] = Field(default_factory=dict, max_length=MAX_COLS)
 
 
 @router.post("/workspaces/{workspace_id}/widgets/{widget_id}/chart")
 def filtered_saved_chart(workspace_id: str, widget_id: str, body: ViewFilters, owner=Depends(user),
                          x_google_access_token: str = Header(default="")):
-    if any(len(key) > 500 or len(values) > 100 or any(len(v) > 2000 for v in values) for key, values in body.filters.items()):
-        raise HTTPException(422, "La selección de filtros es demasiado extensa.")
+    for key, selection in body.filters.items():
+        _, values = filter_selection(selection)
+        if len(key) > 500 or len(values) > 100 or any(len(value) > 2000 for value in values):
+            raise HTTPException(422, "La selección de filtros es demasiado extensa.")
     return render_saved_chart(workspace_id, widget_id, owner, x_google_access_token, body.filters)
 
 
@@ -496,12 +499,14 @@ def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
             allowed.update([cfg.get("x_col", ""), cfg.get("y_col", ""), cfg.get("group_col", ""), *cfg.get("filters", {})])
     if any(column not in allowed for column in filters):
         raise HTTPException(422, "Solo podés filtrar por los campos habilitados en esta sección.")
-    applicable = {column: values for column, values in filters.items() if column in frame.columns}
+    applicable = {column: selection for column, selection in filters.items() if column in frame.columns}
     options = contextual_filter_options(frame, allowed, applicable)
     for column, option in options.items():
         option['type'] = metadata['column_meta'][column]['type']
-    result = chart(frame, {**config.model_dump(), "filters": applicable})
+    filtered_frame = apply_view_filters(frame, applicable)
+    result = chart(filtered_frame, {**config.model_dump(), "filters": {}})
     result["filter_options"] = options
-    result["ignored_filters"] = [column for column, values in filters.items() if values and column not in frame.columns]
+    result["ignored_filters"] = [column for column, selection in filters.items()
+                                 if filter_selection(selection)[1] and column not in frame.columns]
     result["warnings"] = metadata["warnings"] + result.get("warnings", [])
     return result
