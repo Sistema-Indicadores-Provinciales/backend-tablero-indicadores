@@ -33,6 +33,47 @@ class SectionFilterTests(unittest.TestCase):
         return self.client.post(f'/v2/workspaces/workspace-a/widgets/{widget}/chart',
                                 headers=self.headers(self.viewer), json={'filters': filters or {}})
 
+    def render(self, filters=None, snapshot_id=None, refresh=False):
+        body = {'filters': filters or {}}
+        if snapshot_id:
+            body['snapshot_id'] = snapshot_id
+        if refresh:
+            body['refresh'] = True
+        return self.client.post('/v2/workspaces/workspace-a/render',
+                                headers=self.headers(self.viewer), json=body)
+
+    def test_section_render_reuses_one_source_snapshot_until_manual_refresh(self):
+        snapshot_ids = []
+        try:
+            with patch.object(api, 'table_from_source', wraps=api.table_from_source) as load:
+                first = self.render()
+                self.assertEqual(first.status_code, 200, first.text)
+                first_body = first.json()
+                snapshot_ids.append(first_body['snapshot_id'])
+                self.assertEqual(load.call_count, 1)
+                self.assertEqual(first_body['widgets']['total']['data']['datasets'][0]['data'], [35])
+
+                filtered = self.render({'Mes': ['Enero']}, first_body['snapshot_id'])
+                self.assertEqual(filtered.status_code, 200, filtered.text)
+                self.assertEqual(load.call_count, 1)
+                self.assertEqual(filtered.json()['widgets']['total']['data']['datasets'][0]['data'], [15])
+
+                refreshed = self.render({'Mes': ['Enero']}, first_body['snapshot_id'], refresh=True)
+                self.assertEqual(refreshed.status_code, 200, refreshed.text)
+                snapshot_ids.append(refreshed.json()['snapshot_id'])
+                self.assertNotEqual(refreshed.json()['snapshot_id'], first_body['snapshot_id'])
+                self.assertEqual(load.call_count, 2)
+        finally:
+            for snapshot_id in snapshot_ids:
+                api.snapshots.discard(snapshot_id)
+
+    def test_missing_section_snapshot_requires_manual_refresh_without_reading_source(self):
+        with patch.object(api, 'table_from_source') as read:
+            response = self.render({'Mes': ['Enero']}, 'missing-snapshot')
+        self.assertEqual(response.status_code, 409)
+        self.assertIn('Actualizar datos', response.json()['detail'])
+        read.assert_not_called()
+
     def test_year_and_month_apply_to_indicator_and_all_charts_without_changing_saved_data(self):
         original = copy.deepcopy(self.db.analytics_workspaces.find_one())
         for widget in self.widgets:
@@ -129,4 +170,5 @@ class SectionFilterTests(unittest.TestCase):
         self.db.users.update_one({'_id': self.viewer}, {'$set': {'access': []}})
         with patch.object(api, 'table_from_source') as read:
             self.assertEqual(self.query(filters={'Año': ['2026']}).status_code, 404)
+            self.assertEqual(self.render(filters={'Año': ['2026']}).status_code, 404)
             read.assert_not_called()

@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
+from time import monotonic
 from typing import Annotated
 from uuid import UUID, uuid4
 from urllib.parse import urlparse, quote
@@ -14,7 +15,7 @@ import httpx
 import jwt
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
-from pydantic import BaseModel, Field, ConfigDict, SecretStr
+from pydantic import BaseModel, Field, ConfigDict, SecretStr, ValidationError
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from starlette.concurrency import run_in_threadpool
@@ -27,6 +28,7 @@ from app.workspace_access import current_user, owned_workspace, ensure_menu, pub
 from app.section_access import (create_section, section_options, require_admin, dashboard_for,
                                 validate_destination, target_section)
 from app.google_public import parse_link, read_public_rows, SHEET_NAME
+from app.section_snapshots import SectionSnapshot, snapshots
 
 BASE = Path(__file__).resolve().parents[1]
 load_dotenv(BASE.parent / ".env", override=False)
@@ -304,6 +306,134 @@ def table_from_source(doc, config, google_token):
         metadata["warnings"].append("Las fórmulas se leen por su último resultado guardado. Si faltan valores, recalculá y guardá el Excel antes de subirlo.")
     return frame, metadata
 
+
+def read_config_key(config: ReadConfig) -> str:
+    """Identify a parsed table without considering chart-only settings."""
+    read = config.model_dump(include={"sheet", "header_row", "decimal", "types"})
+    return json.dumps(read, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def workspace_fingerprint(workspace: dict) -> str:
+    """Reject snapshots after a saved workspace changes configuration."""
+    payload = {
+        "source_id": workspace.get("source_id"),
+        "widgets": [{"id": item.get("id"), "config": item.get("config")} for item in workspace.get("widgets", [])],
+        "filter_columns": workspace.get("filter_columns"),
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def workspace_view_payload(workspace: dict, source: dict, owner: str) -> dict:
+    return {
+        **public(workspace),
+        "can_edit": workspace["owner"] == owner,
+        "source_kind": source["kind"],
+        "source_access_mode": source.get("access_mode"),
+    }
+
+
+def validate_view_filters(filters: dict) -> None:
+    """Keep viewer filter requests bounded before calculating a section."""
+    try:
+        for key, selection in filters.items():
+            _, values = filter_selection(selection)
+            if len(key) > 500 or len(values) > 100 or any(len(value) > 2000 for value in values):
+                raise HTTPException(422, "La selección de filtros es demasiado extensa.")
+    except DataError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+def load_section_snapshot(workspace: dict, source: dict, viewer: str, google_token: str) -> SectionSnapshot:
+    """Read each distinct sheet configuration once and retain no credential."""
+    if source["kind"] == "google" and source.get("access_mode") != "public":
+        google_token = google_token or google_oauth.access_token(db(), viewer)
+    tables: dict[str, tuple[object, dict]] = {}
+    for widget in workspace.get("widgets", []):
+        config = ChartConfig.model_validate(widget["config"])
+        key = read_config_key(config)
+        if key in tables:
+            continue
+        frame, metadata = table_from_source(source, config, google_token)
+        metadata.pop("raw_preview", None)
+        tables[key] = (frame, metadata)
+    return SectionSnapshot(uuid4().hex, workspace["_id"], viewer, workspace_fingerprint(workspace), tables, monotonic())
+
+
+def section_allowed_columns(workspace: dict, snapshot: SectionSnapshot) -> set[str]:
+    configured = workspace.get("filter_columns")
+    if configured is not None:
+        return set(configured)
+    allowed: set[str] = set()
+    for saved in workspace.get("widgets", []):
+        config = ChartConfig.model_validate(saved["config"])
+        frame, _ = snapshot.tables[read_config_key(config)]
+        if config.chart_type == "table":
+            allowed.update(frame.columns)
+        allowed.update([config.x_col, config.y_col, config.group_col, *config.filters])
+    allowed.discard("")
+    return allowed
+
+
+def render_snapshot_widget(widget: dict, snapshot: SectionSnapshot, filters: dict, allowed: set[str]) -> dict:
+    """Calculate one widget from an already loaded table."""
+    config = ChartConfig.model_validate(widget["config"])
+    frame, metadata = snapshot.tables[read_config_key(config)]
+    frame = filter_frame(frame, config.filters)
+    applicable = {column: selection for column, selection in filters.items() if column in frame.columns}
+    options = contextual_filter_options(frame, allowed, applicable)
+    for column, option in options.items():
+        option["type"] = metadata["column_meta"][column]["type"]
+    filtered_frame = apply_view_filters(frame, applicable)
+    result = chart(filtered_frame, {**config.model_dump(), "filters": {}})
+    result["filter_options"] = options
+    result["ignored_filters"] = [column for column, selection in filters.items()
+                                 if filter_selection(selection)[1] and column not in frame.columns]
+    result["warnings"] = metadata["warnings"] + result.get("warnings", [])
+    return result
+
+
+def merge_section_filter_options(rendered: dict[str, dict], filters: dict) -> dict:
+    """Publish one coherent set of contextual choices for the shared filter bar."""
+    merged, ranks = {}, {}
+    for item in rendered.values():
+        data = item.get("data")
+        if not data:
+            continue
+        rank = len(data.get("ignored_filters", []))
+        for column, option in data.get("filter_options", {}).items():
+            if column in ranks and rank > ranks[column]:
+                continue
+            if ranks.get(column) != rank:
+                merged.pop(column, None)
+            ranks[column] = rank
+            previous = merged.get(column, {})
+            values = list(dict.fromkeys([*previous.get("values", []), *option.get("values", [])]))
+            _, selected = filter_selection(filters.get(column, []))
+            available = option.get("available_selected") or [value for value in selected if value in option.get("values", [])]
+            merged[column] = {
+                "values": values[:100],
+                "total": max(len(values), previous.get("total", 0), option.get("total", 0)),
+                "unfiltered_total": max(previous.get("unfiltered_total", 0), option.get("unfiltered_total", 0)),
+                "type": option.get("type"),
+                "available_selected": list(dict.fromkeys([*previous.get("available_selected", []), *available])),
+            }
+    return merged
+
+
+def render_section_snapshot(workspace: dict, snapshot: SectionSnapshot, filters: dict) -> tuple[dict, dict]:
+    """Render all widgets while isolating a chart-specific data error."""
+    allowed = section_allowed_columns(workspace, snapshot)
+    if any(column not in allowed for column in filters):
+        raise HTTPException(422, "Solo podés filtrar por los campos habilitados en esta sección.")
+    rendered: dict[str, dict] = {}
+    for widget in workspace.get("widgets", []):
+        try:
+            rendered[widget["id"]] = {"data": render_snapshot_widget(widget, snapshot, filters, allowed)}
+        except (DataError, ValidationError, ValueError) as exc:
+            rendered[widget["id"]] = {"error": str(exc) or "No se pudo generar este gráfico."}
+    return rendered, merge_section_filter_options(rendered, filters)
+
 @router.post("/sources/{source_id}/preview")
 def preview(source_id: str, config: ReadConfig, owner=Depends(user), x_google_access_token: str = Header(default="")):
     return load_table(source_id, owner, config, x_google_access_token)[1]
@@ -367,6 +497,7 @@ def update_workspace(workspace_id: str, config: Workspace, owner=Depends(user)):
     result = db().analytics_workspaces.update_one({"_id": workspace_id, "owner": owner, "deletedAt": None}, {"$set": body})
     if not result.matched_count:
         raise HTTPException(404, "El tablero no existe o no tenés acceso.")
+    snapshots.discard_workspace(workspace_id)
     return {"_id": workspace_id, **body}
 
 
@@ -452,8 +583,8 @@ def get_workspace(workspace_id: str, owner=Depends(user)):
 @router.get("/workspaces/{workspace_id}/view")
 def workspace_view(workspace_id: str, owner=Depends(user)):
     workspace = view_workspace(db(), workspace_id, owner)
-    doc = source_for(workspace["source_id"], workspace["owner"])
-    return {**public(workspace), "can_edit": workspace["owner"] == owner, "source_kind": doc["kind"], "source_access_mode": doc.get("access_mode")}
+    source = source_for(workspace["source_id"], workspace["owner"])
+    return workspace_view_payload(workspace, source, owner)
 
 
 @router.get("/workspaces/{workspace_id}/widgets/{widget_id}/chart")
@@ -466,14 +597,44 @@ class ViewFilters(BaseModel):
     filters: dict[str, list[str] | dict[str, list[str]]] = Field(default_factory=dict, max_length=MAX_COLS)
 
 
+class SectionRenderRequest(ViewFilters):
+    snapshot_id: str | None = Field(default=None, min_length=1, max_length=100)
+    refresh: bool = False
+
+
 @router.post("/workspaces/{workspace_id}/widgets/{widget_id}/chart")
 def filtered_saved_chart(workspace_id: str, widget_id: str, body: ViewFilters, owner=Depends(user),
                          x_google_access_token: str = Header(default="")):
-    for key, selection in body.filters.items():
-        _, values = filter_selection(selection)
-        if len(key) > 500 or len(values) > 100 or any(len(value) > 2000 for value in values):
-            raise HTTPException(422, "La selección de filtros es demasiado extensa.")
+    validate_view_filters(body.filters)
     return render_saved_chart(workspace_id, widget_id, owner, x_google_access_token, body.filters)
+
+
+@router.post("/workspaces/{workspace_id}/render")
+def render_workspace_section(workspace_id: str, body: SectionRenderRequest, owner=Depends(user),
+                             x_google_access_token: str = Header(default="")):
+    """Render the section without rereading its spreadsheet on filter changes."""
+    validate_view_filters(body.filters)
+    workspace = view_workspace(db(), workspace_id, owner)
+    source = source_for(workspace["source_id"], workspace["owner"])
+    fingerprint = workspace_fingerprint(workspace)
+    snapshot = None
+    if not body.refresh and body.snapshot_id:
+        snapshot = snapshots.get(body.snapshot_id, workspace_id, owner, fingerprint)
+        if snapshot is None:
+            raise HTTPException(409, "Los datos temporales de esta vista ya no están disponibles. Presioná Actualizar datos.")
+    if snapshot is None:
+        # Keep the previous data if a manual refresh cannot read the source.
+        snapshot = load_section_snapshot(workspace, source, owner, x_google_access_token)
+        snapshots.put(snapshot)
+        if body.refresh:
+            snapshots.discard(body.snapshot_id)
+    widgets, filter_options = render_section_snapshot(workspace, snapshot, body.filters)
+    return {
+        "snapshot_id": snapshot.snapshot_id,
+        "workspace": workspace_view_payload(workspace, source, owner),
+        "widgets": widgets,
+        "filter_options": filter_options,
+    }
 
 
 def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
