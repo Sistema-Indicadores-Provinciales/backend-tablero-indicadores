@@ -2,7 +2,9 @@
 import csv
 import math
 import re
+import unicodedata
 from datetime import date, datetime, time
+from functools import cmp_to_key
 from pathlib import Path
 from zipfile import ZipFile, BadZipFile
 
@@ -14,7 +16,10 @@ MAX_ROWS = 100_000
 MAX_COLS = 256
 MAX_CELLS = 2_000_000
 MAX_POINTS = 10_000
-CHART_TYPES = {"bar", "horizontal", "stacked", "line", "area", "scatter", "pie", "donut", "histogram", "box", "heatmap", "table", "indicator"}
+MAX_MAP_POINTS = 2_000
+CHART_TYPES = {"bar", "horizontal", "stacked", "line", "area", "scatter", "pie", "donut", "histogram", "box", "heatmap", "table", "indicator", "map"}
+MULTI_METRIC_CHART_TYPES = {"bar", "horizontal", "stacked", "line"}
+SORT_AGGREGATIONS = {"alphabetical", "sum", "max", "min", "count", "distinct"}
 
 class DataError(ValueError):
     pass
@@ -241,7 +246,85 @@ def filter_frame(frame, filters):
     return frame
 
 
-def contextual_filter_options(frame, columns, filters):
+def natural_key(value):
+    """Build a stable, accent-insensitive key that keeps numeric values natural."""
+    value = safe(value)
+    if value is None:
+        return (1, ())
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return (0, ((0, float(value)),))
+    normalized = unicodedata.normalize("NFD", str(value).casefold())
+    normalized = "".join(char for char in normalized if unicodedata.category(char) != "Mn")
+    chunks = tuple((0, int(part)) if part.isdigit() else (1, part) for part in re.split(r"(\d+)", normalized) if part)
+    return (0, chunks)
+
+
+def _sort_score(values, aggregation):
+    present = [safe(value) for value in values if safe(value) is not None]
+    if aggregation == "alphabetical":
+        return min(present, key=natural_key) if present else None
+    if aggregation == "count":
+        return len(present)
+    if aggregation == "distinct":
+        return len({json_key(value) for value in present})
+    if any(not isinstance(value, (int, float, bool)) for value in present):
+        raise DataError("El campo elegido para ordenar debe estar configurado como número.")
+    numeric = [float(value) for value in present]
+    if not numeric:
+        return None
+    if aggregation == "sum":
+        return sum(numeric)
+    if aggregation == "max":
+        return max(numeric)
+    if aggregation == "min":
+        return min(numeric)
+    raise DataError("Operación de orden no válida.")
+
+
+def json_key(value):
+    value = safe(value)
+    return f"{type(value).__name__}:{value}"
+
+
+def _compare_sort_items(first, second, direction):
+    first_value, first_score = first
+    second_value, second_score = second
+    if first_score is None and second_score is not None:
+        return 1
+    if second_score is None and first_score is not None:
+        return -1
+    first_key, second_key = natural_key(first_score), natural_key(second_score)
+    comparison = (first_key > second_key) - (first_key < second_key)
+    if direction == "desc":
+        comparison *= -1
+    if comparison:
+        return comparison
+    first_name, second_name = natural_key(first_value), natural_key(second_value)
+    return (first_name > second_name) - (first_name < second_name)
+
+
+def sort_group_values(frame, group_column, config, *, strict=True):
+    """Order dimension values using a selected field and aggregation."""
+    if group_column not in frame:
+        raise DataError("El campo que se quiere ordenar no existe.")
+    groups = frame.groupby(group_column, dropna=False, sort=False)
+    values = [safe(value) for value, _ in groups]
+    if not config:
+        return sorted(values, key=natural_key)
+    aggregation = config.get("aggregation", "alphabetical")
+    direction = config.get("direction", "asc")
+    field = config.get("field") or group_column
+    if aggregation not in SORT_AGGREGATIONS or direction not in {"asc", "desc"}:
+        raise DataError("Configuración de orden no válida.")
+    if field not in frame:
+        if strict:
+            raise DataError(f"El campo elegido para ordenar, '{field}', no existe en estos datos.")
+        return values
+    scored = [(safe(value), _sort_score(subframe[field].tolist(), aggregation)) for value, subframe in groups]
+    return [value for value, _ in sorted(scored, key=cmp_to_key(lambda a, b: _compare_sort_items(a, b, direction)))]
+
+
+def contextual_filter_options(frame, columns, filters, sorts=None):
     # Normalize once per column. Counting failed conditions lets each facet exclude
     # its own selection without refiltering/downloading the table for every field.
     keyed = {col: filter_keys(frame[col], filter_selection(filters.get(col, []))[1]) for col in frame.columns if col in columns}
@@ -254,13 +337,23 @@ def contextual_filter_options(frame, columns, filters):
         misses[col] = (~matches if mode == "include" else matches).astype('int16')
     failures = sum(misses.values()) if misses else None
     options = {}
+    sorts = sorts or {}
     for col, (keys, selected) in keyed.items():
-        visible = keys if failures is None else keys[(failures - misses.get(col, 0)) == 0]
-        values = list(dict.fromkeys(visible))
+        mask = None if failures is None else (failures - misses.get(col, 0)) == 0
+        visible = keys if mask is None else keys[mask]
+        visible_frame = frame if mask is None else frame[mask]
+        sort_config = sorts.get(col)
+        sort_applied = bool(sort_config and (sort_config.get("field") or col) in visible_frame.columns)
+        if sort_applied:
+            ordered = sort_group_values(visible_frame, col, sort_config, strict=False)
+            values = [filter_value(value) for value in ordered]
+        else:
+            values = list(dict.fromkeys(visible))
         available = set(values)
         _, raw_selected = filter_selection(filters.get(col, []))
         options[col] = {
             'values': values[:100], 'total': len(values), 'unfiltered_total': keys.nunique(),
+            'sort_applied': sort_applied,
             # Validate selected values against the whole facet, beyond the 100 suggestions.
             'available_selected': [value for value, key in zip(raw_selected, selected) if key in available],
         }
@@ -282,13 +375,99 @@ def apply_view_filters(frame, filters):
     return result
 
 
+def bucket_dates(frame, column, bucket):
+    """Replace a date dimension with the requested calendar bucket."""
+    if bucket == "none":
+        return
+    if bucket not in {"month", "year"}:
+        raise DataError("Agrupación temporal no válida.")
+    dates = pd.to_datetime(frame[column], errors="coerce")
+    if dates.isna().any():
+        raise DataError("Para agrupar por fecha, configurá el eje X como fecha y corregí los valores vacíos.")
+    frame[column] = dates.dt.strftime("%Y-%m" if bucket == "month" else "%Y")
+
+
+def coordinate(value, limit, decimal=","):
+    """Parse decimal degrees, including coordinates split into two 3-digit blocks."""
+    if value is None or isinstance(value, bool):
+        return None, False
+    parsed = number(value, decimal)
+    normalized = False
+    if parsed is None:
+        text = str(value).strip().replace("\u00a0", "").replace(" ", "")
+        match = re.fullmatch(r"([+-]?)(\d{1,3})([,.])(\d{3})\3(\d{3})", text)
+        if not match:
+            return None, False
+        parsed = float(f"{match.group(1)}{match.group(2)}.{match.group(4)}{match.group(5)}")
+        normalized = True
+    parsed = float(parsed)
+    if abs(parsed) > limit and abs(parsed) >= 1_000_000 and parsed.is_integer():
+        scaled = parsed / 1_000_000
+        if abs(scaled) <= limit:
+            parsed = scaled
+            normalized = True
+    if not math.isfinite(parsed) or abs(parsed) > limit:
+        return None, normalized
+    return parsed, normalized
+
+
 def chart(frame, cfg):
     kind = cfg.get("chart_type", "bar")
     agg = cfg.get("aggregation", "sum")
     x, y, group = cfg.get("x_col", ""), cfg.get("y_col", ""), cfg.get("group_col", "")
+    additional_metrics = cfg.get("y_cols") or []
+    metrics = list(dict.fromkeys(column for column in [y, *additional_metrics] if column))
+    multiple_metrics = kind in MULTI_METRIC_CHART_TYPES and agg != "count" and len(metrics) > 1
+    active_metrics = metrics if multiple_metrics else [y]
     if kind not in CHART_TYPES or agg not in {"sum", "mean", "median", "min", "max", "count", "distinct"}:
         raise DataError("Tipo de gráfico u operación no válido.")
-    required = [x] + ([y] if agg != "count" or kind in {"scatter", "box", "histogram"} else []) + ([group] if group else [])
+    if kind == "map":
+        latitude = cfg.get("latitude_col", "")
+        longitude = cfg.get("longitude_col", "")
+        label = cfg.get("label_col", "")
+        size = cfg.get("size_col", "")
+        map_metrics = list(dict.fromkeys(cfg.get("map_metric_cols") or []))
+        mode = cfg.get("map_mode", "markers")
+        required = [latitude, longitude] + ([label] if label else []) + ([size] if size else []) + map_metrics
+        if mode not in {"markers", "circles"} or any(column not in frame for column in required):
+            raise DataError("Elegí columnas válidas de latitud y longitud para el mapa.")
+        frame = filter_frame(frame.copy(), cfg.get("filters", {}))
+        rows = len(frame)
+        if rows > MAX_MAP_POINTS:
+            raise DataError("El mapa supera 2.000 puntos. Aplicá filtros antes de generarlo.")
+        points, invalid_coordinates, invalid_sizes, normalized_coordinates = [], 0, 0, 0
+        for index, row in frame.iterrows():
+            lat, normalized_latitude = coordinate(row[latitude], 90, cfg.get("decimal", ","))
+            lng, normalized_longitude = coordinate(row[longitude], 180, cfg.get("decimal", ","))
+            if lat is None or lng is None:
+                invalid_coordinates += 1
+                continue
+            normalized_coordinates += int(normalized_latitude) + int(normalized_longitude)
+            value = safe(row[size]) if size else None
+            if value is not None and (not isinstance(value, (int, float)) or isinstance(value, bool)):
+                invalid_sizes += 1
+                value = None
+            points.append({
+                "id": str(index), "lat": float(lat), "lng": float(lng),
+                "label": str(safe(row[label])) if label and safe(row[label]) is not None else f"Punto {len(points) + 1}",
+                "value": value,
+                **({"metrics": [{"field": metric, "value": safe(row[metric])} for metric in map_metrics]} if map_metrics else {}),
+            })
+        if rows and not points:
+            raise DataError("No hay coordenadas válidas para mostrar en el mapa.")
+        warnings = []
+        if invalid_coordinates:
+            warnings.append(f"Se omitieron {invalid_coordinates} filas con coordenadas inválidas.")
+        if invalid_sizes:
+            warnings.append(f"{invalid_sizes} valores de tamaño no eran numéricos; se usará el tamaño predeterminado.")
+        if normalized_coordinates:
+            warnings.append(f"Se normalizaron {normalized_coordinates} coordenadas escritas con seis decimales separados en bloques.")
+        return {"labels": [], "datasets": [], "map_points": points, "filtered_rows": rows, "warnings": warnings}
+    if kind == "table" and additional_metrics:
+        required_metrics = metrics
+    else:
+        required_metrics = active_metrics if agg != "count" or kind in {"scatter", "box", "histogram"} else []
+    required = [x, *required_metrics] + ([group] if group else [])
     if any(c not in frame for c in required):
         raise DataError("Elegí columnas válidas para este gráfico.")
     frame = frame.copy()
@@ -296,10 +475,62 @@ def chart(frame, cfg):
     rows = len(frame)
     warnings = []
     if kind == "table":
-        cols = list(frame.columns)
+        # Las tablas antiguas mantienen todas las columnas; al agregar métricas,
+        # la selección pasa a definir explícitamente sus columnas visibles.
+        cols = list(dict.fromkeys([x, *metrics] + ([group] if group else []))) if additional_metrics else list(frame.columns)
         return {"labels": [], "datasets": [], "filtered_rows": rows, "columns": cols, "records": [{c: safe(v) for c, v in r.items()} for r in frame[cols].head(500).to_dict("records")], "warnings": ["Vista limitada a 500 filas."] if rows > 500 else []}
     if not rows:
         return {"labels": [], "datasets": [], "filtered_rows": 0, "warnings": []}
+    if multiple_metrics:
+        numeric_required = agg not in {"distinct"}
+        if numeric_required:
+            for metric in active_metrics:
+                if any(value is not None and not isinstance(value, (int, float, bool)) for value in frame[metric]):
+                    raise DataError(f"'{metric}' contiene texto. Elegí contar valores distintos o configurá su tipo como número en la vista previa.")
+                missing = frame[metric].isna().sum()
+                if missing:
+                    warnings.append(f"{missing} filas sin valor numérico no se usaron para {metric}.")
+            # Una fila puede contribuir a una métrica aunque otra esté vacía.
+            aggregate_frame = frame[frame[active_metrics].notna().any(axis=1)].copy()
+            if aggregate_frame.empty:
+                raise DataError("No hay valores numéricos válidos para esta selección.")
+        else:
+            aggregate_frame = frame.copy()
+        bucket_dates(aggregate_frame, x, cfg.get("date_bucket", "none"))
+        keys = list(dict.fromkeys([x] + ([group] if group else [])))
+        grouped = aggregate_frame.groupby(keys, dropna=False, sort=False)
+        results = {}
+        for metric in active_metrics:
+            if agg == "distinct":
+                results[metric] = grouped[metric].nunique()
+            elif agg == "sum":
+                results[metric] = grouped[metric].sum(min_count=1)
+            else:
+                results[metric] = getattr(grouped[metric], agg)()
+        labels = sort_group_values(aggregate_frame, x, cfg.get("category_sort"))
+        series_label = lambda value: "Sin dato" if safe(value) is None else str(safe(value))
+        if group:
+            group_values = [series_label(value) for value in sort_group_values(aggregate_frame, group, cfg.get("series_sort"))]
+        else:
+            group_values = [None]
+        series_count = len(active_metrics) * len(group_values)
+        if series_count > 50:
+            raise DataError("Hay más de 50 series entre métricas y grupos. Aplicá filtros o quitá métricas.")
+        if len(labels) * series_count > MAX_POINTS:
+            raise DataError("El resultado supera 10.000 puntos. Aplicá filtros, quitá métricas o agrupá por mes/año.")
+        group_index = keys.index(group) if group else None
+        datasets = []
+        for metric in active_metrics:
+            pairs = [(key if isinstance(key, tuple) else (key,), safe(value)) for key, value in results[metric].items()]
+            matrix = {(safe(key[0]), series_label(key[group_index]) if group else None): value for key, value in pairs}
+            for group_value in group_values:
+                datasets.append({
+                    "label": f"{metric} · {group_value}" if group else metric,
+                    "metric": metric,
+                    **({"group": group_value} if group else {}),
+                    "data": [matrix.get((label, group_value)) for label in labels],
+                })
+        return {"labels": labels, "datasets": datasets, "filtered_rows": rows, "warnings": warnings}
     numeric_required = agg not in {"count", "distinct"} or kind in {"scatter", "histogram", "box"}
     if numeric_required:
         if any(v is not None and not isinstance(v, (int, float, bool)) for v in frame[y]):
@@ -310,13 +541,7 @@ def chart(frame, cfg):
         frame = frame[frame[y].notna()]
         if frame.empty:
             raise DataError("No hay valores numéricos válidos para esta selección.")
-    if cfg.get("date_bucket", "none") != "none":
-        if cfg["date_bucket"] not in {"month", "year"}:
-            raise DataError("Agrupación temporal no válida.")
-        dates = pd.to_datetime(frame[x], errors="coerce")
-        if dates.isna().any():
-            raise DataError("Para agrupar por fecha, configurá el eje X como fecha y corregí los valores vacíos.")
-        frame[x] = dates.dt.strftime("%Y-%m" if cfg["date_bucket"] == "month" else "%Y")
+    bucket_dates(frame, x, cfg.get("date_bucket", "none"))
     if kind in {"scatter", "histogram", "box"}:
         if len(frame) > MAX_POINTS:
             raise DataError("El gráfico supera 10.000 puntos. Aplicá filtros antes de generar.")
@@ -326,7 +551,12 @@ def chart(frame, cfg):
         grouping = group or (x if kind == "box" else None)
         groups = frame.groupby(grouping, dropna=False, sort=False) if grouping else [(y, frame)]
         for label, sub in groups:
-            datasets.append({"label": str(safe(label) or "Sin dato"), "x": [safe(v) for v in sub[x]], "data": [safe(v) for v in sub[y]]})
+            label = safe(label)
+            datasets.append({"label": "Sin dato" if label is None else str(label), "x": [safe(v) for v in sub[x]], "data": [safe(v) for v in sub[y]]})
+        if grouping and cfg.get("series_sort"):
+            ordered = [str(value if value is not None else "Sin dato") for value in sort_group_values(frame, grouping, cfg["series_sort"])]
+            ranks = {value: index for index, value in enumerate(ordered)}
+            datasets.sort(key=lambda dataset: ranks.get(dataset["label"], len(ranks)))
         if len(datasets) > 50:
             raise DataError("Hay más de 50 series. Aplicá filtros.")
         return {"labels": [], "datasets": datasets, "filtered_rows": rows, "warnings": warnings}
@@ -343,13 +573,15 @@ def chart(frame, cfg):
     if len(result) > MAX_POINTS:
         raise DataError("El resultado supera 10.000 puntos. Aplicá filtros o agrupá por mes/año.")
     pairs = [(k if isinstance(k, tuple) else (k,), safe(v)) for k, v in result.items()]
-    labels = list(dict.fromkeys(safe(k[0]) for k, _ in pairs))
-    labels.sort(key=lambda v: (v is None, 0 if isinstance(v, (int, float)) else 1, v if isinstance(v, (int, float)) else str(v)))
+    labels = sort_group_values(frame, x, cfg.get("category_sort"))
     group_index = keys.index(group) if group else None
-    series = list(dict.fromkeys(str(safe(k[group_index])) for k, _ in pairs)) if group else ["Registros" if agg == "count" else y]
+    series_label = lambda value: "Sin dato" if safe(value) is None else str(safe(value))
+    series = list(dict.fromkeys(series_label(k[group_index]) for k, _ in pairs)) if group else ["Registros" if agg == "count" else y]
+    if group and cfg.get("series_sort"):
+        series = [series_label(value) for value in sort_group_values(frame, group, cfg["series_sort"])]
     if len(series) > 50:
         raise DataError("Hay más de 50 series. Aplicá filtros.")
-    matrix = {(safe(k[0]), str(safe(k[group_index])) if group else series[0]): v for k, v in pairs}
+    matrix = {(safe(k[0]), series_label(k[group_index]) if group else series[0]): v for k, v in pairs}
     datasets = [{"label": s, "data": [matrix.get((v, s)) for v in labels]} for s in series]
     if kind in {"pie", "donut"}:
         if len(datasets) > 1 or len(labels) > 30:

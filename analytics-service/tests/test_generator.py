@@ -12,7 +12,7 @@ import jwt
 import pandas as pd
 from openpyxl import Workbook
 from fastapi.testclient import TestClient
-from app.data_engine import DataError, read_rows, table, chart, number, safe, bounded, CHART_TYPES
+from app.data_engine import DataError, read_rows, table, chart, number, safe, bounded, contextual_filter_options, CHART_TYPES
 from app import generator as api
 from main import app
 
@@ -48,8 +48,78 @@ class EngineTests(unittest.TestCase):
     def test_every_chart_type(self):
         for kind in CHART_TYPES:
             with self.subTest(kind=kind):
-                out = chart(self.df, {**self.cfg, "chart_type": kind})
+                config = {**self.cfg, "chart_type": kind}
+                if kind == "map":
+                    config.update({"latitude_col": "Mes", "longitude_col": "Valor"})
+                out = chart(self.df, config)
                 json.dumps(out, allow_nan=False)
+
+    def test_categories_and_series_sort_by_selected_field(self):
+        category = chart(self.df, {**self.cfg, "category_sort": {
+            "field": "Valor", "aggregation": "sum", "direction": "desc",
+        }})
+        self.assertEqual(category["labels"], [1, 2])
+        ascending = chart(self.df, {**self.cfg, "category_sort": {
+            "field": "Valor", "aggregation": "sum", "direction": "asc",
+        }})
+        self.assertEqual(ascending["labels"], [2, 1])
+        series = chart(self.df, {**self.cfg, "group_col": "Grupo", "series_sort": {
+            "field": "Valor", "aggregation": "sum", "direction": "asc",
+        }})
+        self.assertEqual([dataset["label"] for dataset in series["datasets"]], ["B", "A"])
+
+    def test_sort_supports_count_distinct_and_rejects_text_sum(self):
+        counted = chart(self.df, {**self.cfg, "category_sort": {
+            "field": "Grupo", "aggregation": "count", "direction": "desc",
+        }})
+        self.assertEqual(counted["labels"], [1, 2])
+        distinct = chart(self.df, {**self.cfg, "category_sort": {
+            "field": "Grupo", "aggregation": "distinct", "direction": "desc",
+        }})
+        self.assertEqual(distinct["labels"], [1, 2])
+        with self.assertRaises(DataError):
+            chart(self.df, {**self.cfg, "category_sort": {
+                "field": "Grupo", "aggregation": "sum", "direction": "desc",
+            }})
+
+    def test_map_normalizes_points_and_reports_invalid_coordinates(self):
+        frame, _ = table([
+            ["Latitud", "Longitud", "Nombre", "Tamaño"],
+            [-26.18, -58.17, "Formosa", 20],
+            [95, -58.20, "Inválido", 10],
+        ])
+        out = chart(frame, {
+            "chart_type": "map", "latitude_col": "Latitud", "longitude_col": "Longitud",
+            "label_col": "Nombre", "size_col": "Tamaño", "map_mode": "circles",
+        })
+        self.assertEqual(out["map_points"], [{"id": "0", "lat": -26.18, "lng": -58.17, "label": "Formosa", "value": 20}])
+        self.assertIn("1 filas", out["warnings"][0])
+
+    def test_map_normalizes_blocked_decimals_and_returns_detail_metrics(self):
+        frame, _ = table([
+            ["LATITUD", "LONGITUD", "ESTABLECIMIENTO", "MATRÍCULA", "ESTADO"],
+            ["-25,214,215", "-58,512,852", "Escuela 1", 120, "Activo"],
+            [-26179538, -58179582, "Escuela 2", 85, "Activo"],
+        ])
+        out = chart(frame, {
+            "chart_type": "map", "latitude_col": "LATITUD", "longitude_col": "LONGITUD",
+            "label_col": "ESTABLECIMIENTO", "map_metric_cols": ["MATRÍCULA", "ESTADO"],
+            "decimal": ",",
+        })
+        self.assertEqual((out["map_points"][0]["lat"], out["map_points"][0]["lng"]), (-25.214215, -58.512852))
+        self.assertEqual((out["map_points"][1]["lat"], out["map_points"][1]["lng"]), (-26.179538, -58.179582))
+        self.assertEqual(out["map_points"][0]["label"], "Escuela 1")
+        self.assertEqual(out["map_points"][0]["metrics"], [
+            {"field": "MATRÍCULA", "value": 120}, {"field": "ESTADO", "value": "Activo"},
+        ])
+        self.assertIn("Se normalizaron 4 coordenadas", out["warnings"][0])
+
+    def test_filter_options_use_configured_sort_field(self):
+        options = contextual_filter_options(self.df, {'Grupo'}, {}, {'Grupo': {
+            'field': 'Valor', 'aggregation': 'sum', 'direction': 'asc',
+        }})
+        self.assertEqual(options['Grupo']['values'], ['B', 'A'])
+        self.assertTrue(options['Grupo']['sort_applied'])
 
     def test_pie_rejects_negative(self):
         df, _ = table([["x", "y"], ["a", -1], ["b", 2]])
@@ -65,6 +135,53 @@ class EngineTests(unittest.TestCase):
         out = chart(self.df, {**self.cfg, "group_col": "Grupo"})
         self.assertEqual(out["datasets"][0]["data"], [30, 0])
         self.assertEqual(out["datasets"][1]["data"], [8, None])
+
+    def test_multiple_metrics_create_series_and_combine_with_groups(self):
+        frame, _ = table([
+            ["Mes", "Ingresos", "Egresos", "Grupo"],
+            ["Enero", 10, 3, "A"],
+            ["Enero", 5, 2, "B"],
+            ["Febrero", 7, 4, "A"],
+        ])
+        config = {
+            "x_col": "Mes", "y_col": "Ingresos", "y_cols": ["Egresos"],
+            "aggregation": "sum", "chart_type": "bar",
+        }
+        out = chart(frame, config)
+        self.assertEqual(out["labels"], ["Enero", "Febrero"])
+        self.assertEqual([(item["metric"], item["data"]) for item in out["datasets"]], [
+            ("Ingresos", [15, 7]), ("Egresos", [5, 4]),
+        ])
+        grouped = chart(frame, {**config, "group_col": "Grupo"})
+        self.assertEqual([(item["metric"], item["group"]) for item in grouped["datasets"]], [
+            ("Ingresos", "A"), ("Ingresos", "B"), ("Egresos", "A"), ("Egresos", "B"),
+        ])
+        self.assertEqual(grouped["datasets"][3]["data"], [2, None])
+
+    def test_count_and_single_metric_charts_ignore_additional_metrics(self):
+        counted = chart(self.df, {**self.cfg, "aggregation": "count", "y_cols": ["Grupo"]})
+        self.assertEqual(len(counted["datasets"]), 1)
+        pie = chart(self.df, {**self.cfg, "chart_type": "pie", "y_cols": ["Grupo"]})
+        self.assertEqual(len(pie["datasets"]), 1)
+
+    def test_table_additional_metrics_define_visible_columns(self):
+        frame, _ = table([
+            ["Mes", "Ingresos", "Egresos", "Nota"],
+            ["Enero", 10, 3, "Revisado"],
+        ])
+        out = chart(frame, {
+            "x_col": "Mes", "y_col": "Ingresos", "y_cols": ["Egresos"],
+            "aggregation": "count", "chart_type": "table",
+        })
+        self.assertEqual(out["columns"], ["Mes", "Ingresos", "Egresos"])
+        self.assertNotIn("Nota", out["records"][0])
+
+    def test_chart_config_accepts_additional_metrics(self):
+        config = api.ChartConfig.model_validate({
+            "sheet": "Datos", **self.cfg, "y_cols": ["Grupo"], "map_metric_cols": ["Valor", "Grupo"],
+        })
+        self.assertEqual(config.y_cols, ["Grupo"])
+        self.assertEqual(config.map_metric_cols, ["Valor", "Grupo"])
 
     def test_group_same_as_axis(self):
         out = chart(self.df, {**self.cfg, "group_col": "Mes"})
@@ -206,6 +323,20 @@ class APITests(unittest.TestCase):
             response = self.client.post('/v2/workspaces', headers=self.headers, json={'name': 'Personal', 'source_id': 'my-source', 'widgets': []})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(database.analytics_workspaces.insert_one.call_args.args[0]['owner'], 'user-a')
+
+    def test_workspace_persists_aliases_and_filter_sorts(self):
+        database = MagicMock()
+        body = {
+            'name': 'Personal', 'source_id': 'my-source', 'widgets': [],
+            'column_aliases': {'Valor': 'Monto total'},
+            'filter_sorts': {'Mes': {'field': 'Valor', 'aggregation': 'sum', 'direction': 'desc'}},
+        }
+        with patch.object(api, 'db', return_value=database), patch.object(api, 'source_for', return_value={}):
+            response = self.client.post('/v2/workspaces', headers=self.headers, json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        saved = database.analytics_workspaces.insert_one.call_args.args[0]
+        self.assertEqual(saved['column_aliases'], {'Valor': 'Monto total'})
+        self.assertEqual(saved['filter_sorts']['Mes']['field'], 'Valor')
 
     def test_upload_registers_private_source_and_opaque_filename(self):
         database = MagicMock()

@@ -15,7 +15,7 @@ import httpx
 import jwt
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
-from pydantic import BaseModel, Field, ConfigDict, SecretStr, ValidationError
+from pydantic import BaseModel, Field, ConfigDict, SecretStr, ValidationError, field_validator
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from starlette.concurrency import run_in_threadpool
@@ -273,14 +273,31 @@ class ReadConfig(BaseModel):
     decimal: str = Field(default=",", pattern=r"^[,.]$")
     types: dict[str, str] = Field(default_factory=dict)
 
+
+class SortConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    field: str = Field(min_length=1, max_length=500)
+    aggregation: str = Field(default="alphabetical", pattern=r"^(alphabetical|sum|max|min|count|distinct)$")
+    direction: str = Field(default="asc", pattern=r"^(asc|desc)$")
+
+
 class ChartConfig(ReadConfig):
     chart_type: str = "bar"
     aggregation: str = "sum"
     x_col: str = ""
     y_col: str = ""
+    y_cols: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=19)
     group_col: str = ""
     date_bucket: str = "none"
     filters: dict[str, list[str]] = Field(default_factory=dict)
+    category_sort: SortConfig | None = None
+    series_sort: SortConfig | None = None
+    latitude_col: str = Field(default="", max_length=500)
+    longitude_col: str = Field(default="", max_length=500)
+    label_col: str = Field(default="", max_length=500)
+    size_col: str = Field(default="", max_length=500)
+    map_mode: str = Field(default="markers", pattern=r"^(markers|circles)$")
+    map_metric_cols: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=20)
 
 def load_table(source_id, owner, config, google_token):
     doc = source_for(source_id, owner)
@@ -319,6 +336,8 @@ def workspace_fingerprint(workspace: dict) -> str:
         "source_id": workspace.get("source_id"),
         "widgets": [{"id": item.get("id"), "config": item.get("config")} for item in workspace.get("widgets", [])],
         "filter_columns": workspace.get("filter_columns"),
+        "filter_sorts": workspace.get("filter_sorts"),
+        "column_aliases": workspace.get("column_aliases"),
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
     return hashlib.sha256(encoded.encode()).hexdigest()
@@ -370,18 +389,22 @@ def section_allowed_columns(workspace: dict, snapshot: SectionSnapshot) -> set[s
         frame, _ = snapshot.tables[read_config_key(config)]
         if config.chart_type == "table":
             allowed.update(frame.columns)
-        allowed.update([config.x_col, config.y_col, config.group_col, *config.filters])
+        allowed.update([
+            config.x_col, config.y_col, *config.y_cols, config.group_col,
+            config.latitude_col, config.longitude_col, config.label_col, config.size_col,
+            *config.map_metric_cols, *config.filters,
+        ])
     allowed.discard("")
     return allowed
 
 
-def render_snapshot_widget(widget: dict, snapshot: SectionSnapshot, filters: dict, allowed: set[str]) -> dict:
+def render_snapshot_widget(widget: dict, snapshot: SectionSnapshot, filters: dict, allowed: set[str], filter_sorts: dict) -> dict:
     """Calculate one widget from an already loaded table."""
     config = ChartConfig.model_validate(widget["config"])
     frame, metadata = snapshot.tables[read_config_key(config)]
     frame = filter_frame(frame, config.filters)
     applicable = {column: selection for column, selection in filters.items() if column in frame.columns}
-    options = contextual_filter_options(frame, allowed, applicable)
+    options = contextual_filter_options(frame, allowed, applicable, filter_sorts)
     for column, option in options.items():
         option["type"] = metadata["column_meta"][column]["type"]
     filtered_frame = apply_view_filters(frame, applicable)
@@ -400,8 +423,9 @@ def merge_section_filter_options(rendered: dict[str, dict], filters: dict) -> di
         data = item.get("data")
         if not data:
             continue
-        rank = len(data.get("ignored_filters", []))
+        ignored_rank = len(data.get("ignored_filters", []))
         for column, option in data.get("filter_options", {}).items():
+            rank = (ignored_rank, 0 if option.get("sort_applied") else 1)
             if column in ranks and rank > ranks[column]:
                 continue
             if ranks.get(column) != rank:
@@ -416,6 +440,7 @@ def merge_section_filter_options(rendered: dict[str, dict], filters: dict) -> di
                 "total": max(len(values), previous.get("total", 0), option.get("total", 0)),
                 "unfiltered_total": max(previous.get("unfiltered_total", 0), option.get("unfiltered_total", 0)),
                 "type": option.get("type"),
+                "sort_applied": option.get("sort_applied", previous.get("sort_applied", False)),
                 "available_selected": list(dict.fromkeys([*previous.get("available_selected", []), *available])),
             }
     return merged
@@ -429,7 +454,7 @@ def render_section_snapshot(workspace: dict, snapshot: SectionSnapshot, filters:
     rendered: dict[str, dict] = {}
     for widget in workspace.get("widgets", []):
         try:
-            rendered[widget["id"]] = {"data": render_snapshot_widget(widget, snapshot, filters, allowed)}
+            rendered[widget["id"]] = {"data": render_snapshot_widget(widget, snapshot, filters, allowed, workspace.get("filter_sorts", {}))}
         except (DataError, ValidationError, ValueError) as exc:
             rendered[widget["id"]] = {"error": str(exc) or "No se pudo generar este gráfico."}
     return rendered, merge_section_filter_options(rendered, filters)
@@ -465,7 +490,31 @@ class Workspace(BaseModel):
     source_id: str = Field(max_length=500)
     widgets: list[Widget] = Field(max_length=30)
     filter_columns: list[Annotated[str, Field(min_length=1, max_length=500)]] | None = Field(default=None, max_length=20)
+    column_aliases: dict[str, str] = Field(default_factory=dict, max_length=MAX_COLS)
+    filter_sorts: dict[str, SortConfig] = Field(default_factory=dict, max_length=20)
     destination: Destination | None = None
+
+    @field_validator("column_aliases")
+    @classmethod
+    def validate_aliases(cls, aliases: dict[str, str]) -> dict[str, str]:
+        normalized, labels = {}, set()
+        for column, alias in aliases.items():
+            column, alias = column.strip(), alias.strip()
+            if not column or len(column) > 500 or not alias or len(alias) > 200:
+                raise ValueError("Los nombres visibles de las columnas no son válidos.")
+            key = alias.casefold()
+            if key in labels:
+                raise ValueError("Los nombres visibles de las columnas no pueden repetirse.")
+            labels.add(key)
+            normalized[column] = alias
+        return normalized
+
+    @field_validator("filter_sorts")
+    @classmethod
+    def validate_filter_sort_columns(cls, sorts: dict[str, SortConfig]) -> dict[str, SortConfig]:
+        if any(not column.strip() or len(column) > 500 for column in sorts):
+            raise ValueError("El campo configurado para ordenar un filtro no es válido.")
+        return sorts
 
 @router.get("/workspaces")
 def workspaces(owner=Depends(user)):
@@ -657,11 +706,15 @@ def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
         allowed = set(frame.columns) if config.chart_type == "table" else set()
         for saved in workspace["widgets"]:
             cfg = saved["config"]
-            allowed.update([cfg.get("x_col", ""), cfg.get("y_col", ""), cfg.get("group_col", ""), *cfg.get("filters", {})])
+            allowed.update([
+                cfg.get("x_col", ""), cfg.get("y_col", ""), *cfg.get("y_cols", []), cfg.get("group_col", ""),
+                cfg.get("latitude_col", ""), cfg.get("longitude_col", ""), cfg.get("label_col", ""), cfg.get("size_col", ""),
+                *cfg.get("map_metric_cols", []), *cfg.get("filters", {}),
+            ])
     if any(column not in allowed for column in filters):
         raise HTTPException(422, "Solo podés filtrar por los campos habilitados en esta sección.")
     applicable = {column: selection for column, selection in filters.items() if column in frame.columns}
-    options = contextual_filter_options(frame, allowed, applicable)
+    options = contextual_filter_options(frame, allowed, applicable, workspace.get("filter_sorts", {}))
     for column, option in options.items():
         option['type'] = metadata['column_meta'][column]['type']
     filtered_frame = apply_view_filters(frame, applicable)

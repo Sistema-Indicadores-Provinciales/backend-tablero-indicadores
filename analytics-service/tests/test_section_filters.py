@@ -116,6 +116,16 @@ class SectionFilterTests(unittest.TestCase):
         self.assertEqual(options['Mes']['available_selected'], ['Enero', 'Febrero'])
         self.assertEqual(self.query().json()['filter_options']['Tipo']['values'], ['Individual', 'Grupal'])
 
+    def test_filter_options_sort_by_selected_field_and_follow_context(self):
+        self.db.analytics_workspaces.update_one({}, {'$set': {'filter_sorts': {
+            'Tipo': {'field': 'Total', 'aggregation': 'sum', 'direction': 'desc'},
+        }}})
+        options = self.query().json()['filter_options']['Tipo']
+        self.assertEqual(options['values'], ['B', 'A'])
+        self.assertTrue(options['sort_applied'])
+        january = self.query(filters={'Mes': ['Enero']}).json()['filter_options']['Tipo']
+        self.assertEqual(january['values'], ['A', 'B'])
+
     def test_incompatible_selections_have_recovery_options_without_broadening_results(self):
         original = copy.deepcopy(self.db.analytics_workspaces.find_one())
         # A is only available in January, so these two selections conflict.
