@@ -28,6 +28,7 @@ from app.workspace_access import current_user, owned_workspace, ensure_menu, pub
 from app.section_access import (create_section, section_options, require_admin, dashboard_for,
                                 validate_destination, target_section)
 from app.google_public import parse_link, read_public_rows, SHEET_NAME
+from app.formosa_boundary import load_formosa_boundary
 from app.section_snapshots import SectionSnapshot, snapshots
 
 BASE = Path(__file__).resolve().parents[1]
@@ -62,6 +63,10 @@ def user(authorization: str = Header(default="")):
 
 def public(doc):
     return {k: v for k, v in doc.items() if k not in {"path", "owner", "menu_initialized"}}
+
+@router.get("/maps/formosa-boundary")
+def formosa_boundary(_owner=Depends(user)):
+    return load_formosa_boundary(db())
 
 def source_for(source_id, owner):
     doc = db().analytics_sources.find_one({"_id": source_id, "$or": [{"owner": owner}, {"kind": "system"}]})
