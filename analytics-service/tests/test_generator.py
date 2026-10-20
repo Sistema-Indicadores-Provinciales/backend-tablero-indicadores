@@ -12,6 +12,7 @@ import jwt
 import pandas as pd
 from openpyxl import Workbook
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from app.data_engine import DataError, read_rows, table, chart, number, safe, bounded, contextual_filter_options, CHART_TYPES
 from app import generator as api
 from main import app
@@ -182,6 +183,16 @@ class EngineTests(unittest.TestCase):
         })
         self.assertEqual(config.y_cols, ["Grupo"])
         self.assertEqual(config.map_metric_cols, ["Valor", "Grupo"])
+
+    def test_chart_config_validates_pie_label_mode(self):
+        default = api.ChartConfig.model_validate({"sheet": "Datos", **self.cfg})
+        configured = api.ChartConfig.model_validate({"sheet": "Datos", **self.cfg, "pie_label_mode": "value"})
+        self.assertEqual(default.pie_label_mode, "percent")
+        self.assertEqual(configured.pie_label_mode, "value")
+        with self.assertRaises(ValidationError):
+            api.ChartConfig.model_validate({
+                "sheet": "Datos", **self.cfg, "pie_label_mode": "both",
+            })
 
     def test_group_same_as_axis(self):
         out = chart(self.df, {**self.cfg, "group_col": "Mes"})

@@ -292,6 +292,7 @@ class ChartConfig(ReadConfig):
     x_col: str = ""
     y_col: str = ""
     y_cols: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=19)
+    pie_label_mode: str = Field(default="percent", pattern=r"^(percent|value)$")
     group_col: str = ""
     date_bucket: str = "none"
     filters: dict[str, list[str]] = Field(default_factory=dict)
