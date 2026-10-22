@@ -194,6 +194,27 @@ class EngineTests(unittest.TestCase):
                 "sheet": "Datos", **self.cfg, "pie_label_mode": "both",
             })
 
+    def test_workspace_validates_single_filter_defaults_and_columns(self):
+        valid = {'name': 'Personal', 'source_id': 'my-source', 'widgets': [], 'filter_columns': ['Mes']}
+        for settings in [
+            {'Mes': {'selection_mode': 'single'}},
+            {'Otro': {'selection_mode': 'multiple'}},
+        ]:
+            with self.assertRaises(ValidationError):
+                api.Workspace.model_validate({**valid, 'filter_settings': settings})
+
+    def test_single_filter_mode_rejects_multiple_and_exclusion_requests(self):
+        workspace = {'filter_settings': {
+            'Mes': {'selection_mode': 'single', 'default_value': 'Enero'},
+        }}
+        api.validate_workspace_filter_modes(workspace, {'Mes': ['Enero']})
+        for filters in [
+            {'Mes': ['Enero', 'Febrero']},
+            {'Mes': {'exclude': ['Enero']}},
+        ]:
+            with self.assertRaises(api.HTTPException):
+                api.validate_workspace_filter_modes(workspace, filters)
+
     def test_group_same_as_axis(self):
         out = chart(self.df, {**self.cfg, "group_col": "Mes"})
         self.assertEqual(len(out["datasets"]), 2)
@@ -335,12 +356,14 @@ class APITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(database.analytics_workspaces.insert_one.call_args.args[0]['owner'], 'user-a')
 
-    def test_workspace_persists_aliases_and_filter_sorts(self):
+    def test_workspace_persists_aliases_filter_sorts_and_filter_settings(self):
         database = MagicMock()
         body = {
             'name': 'Personal', 'source_id': 'my-source', 'widgets': [],
+            'filter_columns': ['Mes'],
             'column_aliases': {'Valor': 'Monto total'},
             'filter_sorts': {'Mes': {'field': 'Valor', 'aggregation': 'sum', 'direction': 'desc'}},
+            'filter_settings': {'Mes': {'selection_mode': 'single', 'default_value': 'Enero'}},
         }
         with patch.object(api, 'db', return_value=database), patch.object(api, 'source_for', return_value={}):
             response = self.client.post('/v2/workspaces', headers=self.headers, json=body)
@@ -348,6 +371,7 @@ class APITests(unittest.TestCase):
         saved = database.analytics_workspaces.insert_one.call_args.args[0]
         self.assertEqual(saved['column_aliases'], {'Valor': 'Monto total'})
         self.assertEqual(saved['filter_sorts']['Mes']['field'], 'Valor')
+        self.assertEqual(saved['filter_settings']['Mes'], {'selection_mode': 'single', 'default_value': 'Enero'})
 
     def test_upload_registers_private_source_and_opaque_filename(self):
         database = MagicMock()

@@ -97,6 +97,15 @@ class SectionFilterTests(unittest.TestCase):
         self.assertEqual(self.query().json()['filter_options'], {})
         self.assertEqual(self.query(filters={'Año': ['2026']}).status_code, 422)
 
+    def test_single_choice_filter_rejects_multiple_and_exclusion_requests(self):
+        self.db.analytics_workspaces.update_one({}, {'$set': {'filter_settings': {
+            'Mes': {'selection_mode': 'single', 'default_value': 'Enero'},
+        }}})
+        self.assertEqual(self.query(filters={'Mes': ['Enero']}).status_code, 200)
+        self.assertEqual(self.query(filters={'Mes': ['Enero', 'Febrero']}).status_code, 422)
+        self.assertEqual(self.query(filters={'Mes': {'exclude': ['Enero']}}).status_code, 422)
+        self.assertEqual(self.render(filters={'Mes': ['Enero', 'Febrero']}).status_code, 422)
+
     def test_options_follow_other_filters_but_not_their_own_selection(self):
         # January has only Individual; February also has Grupal. The 2025 row
         # must remain excluded even when the reader clears every filter.

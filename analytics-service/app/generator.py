@@ -15,7 +15,7 @@ import httpx
 import jwt
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
-from pydantic import BaseModel, Field, ConfigDict, SecretStr, ValidationError, field_validator
+from pydantic import BaseModel, Field, ConfigDict, SecretStr, ValidationError, field_validator, model_validator
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from starlette.concurrency import run_in_threadpool
@@ -369,6 +369,17 @@ def validate_view_filters(filters: dict) -> None:
         raise HTTPException(422, str(exc)) from exc
 
 
+def validate_workspace_filter_modes(workspace: dict, filters: dict) -> None:
+    """Reject multiple or exclusion selections for single-choice filters."""
+    settings = workspace.get("filter_settings") or {}
+    for column, selection in filters.items():
+        if settings.get(column, {}).get("selection_mode") != "single":
+            continue
+        mode, values = filter_selection(selection)
+        if mode != "include" or len(values) > 1:
+            raise HTTPException(422, f"El filtro {column} admite una sola opción.")
+
+
 def load_section_snapshot(workspace: dict, source: dict, viewer: str, google_token: str) -> SectionSnapshot:
     """Read each distinct sheet configuration once and retain no credential."""
     if source["kind"] == "google" and source.get("access_mode") != "public":
@@ -490,6 +501,18 @@ class Destination(BaseModel):
     sectionId: str = Field(pattern=r"^[a-fA-F0-9]{24}$")
 
 
+class SectionFilterConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    selection_mode: str = Field(default="multiple", pattern=r"^(multiple|single)$")
+    default_value: str | None = Field(default=None, min_length=1, max_length=2000)
+
+    @model_validator(mode="after")
+    def require_single_default(self):
+        if self.selection_mode == "single" and self.default_value is None:
+            raise ValueError("Los filtros de selección individual requieren un valor predeterminado.")
+        return self
+
+
 class Workspace(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str = Field(min_length=1, max_length=200)
@@ -498,6 +521,7 @@ class Workspace(BaseModel):
     filter_columns: list[Annotated[str, Field(min_length=1, max_length=500)]] | None = Field(default=None, max_length=20)
     column_aliases: dict[str, str] = Field(default_factory=dict, max_length=MAX_COLS)
     filter_sorts: dict[str, SortConfig] = Field(default_factory=dict, max_length=20)
+    filter_settings: dict[str, SectionFilterConfig] = Field(default_factory=dict, max_length=20)
     destination: Destination | None = None
 
     @field_validator("column_aliases")
@@ -521,6 +545,13 @@ class Workspace(BaseModel):
         if any(not column.strip() or len(column) > 500 for column in sorts):
             raise ValueError("El campo configurado para ordenar un filtro no es válido.")
         return sorts
+
+    @model_validator(mode="after")
+    def validate_filter_setting_columns(self):
+        columns = set(self.filter_columns or [])
+        if any(not column.strip() or len(column) > 500 or column not in columns for column in self.filter_settings):
+            raise ValueError("Solo se pueden configurar campos habilitados como filtros de la sección.")
+        return self
 
 @router.get("/workspaces")
 def workspaces(owner=Depends(user)):
@@ -670,6 +701,7 @@ def render_workspace_section(workspace_id: str, body: SectionRenderRequest, owne
     """Render the section without rereading its spreadsheet on filter changes."""
     validate_view_filters(body.filters)
     workspace = view_workspace(db(), workspace_id, owner)
+    validate_workspace_filter_modes(workspace, body.filters)
     source = source_for(workspace["source_id"], workspace["owner"])
     fingerprint = workspace_fingerprint(workspace)
     snapshot = None
@@ -694,6 +726,7 @@ def render_workspace_section(workspace_id: str, body: SectionRenderRequest, owne
 
 def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
     workspace = view_workspace(db(), workspace_id, owner)
+    validate_workspace_filter_modes(workspace, filters)
     widget = next((w for w in workspace["widgets"] if w["id"] == widget_id), None)
     if widget is None:
         raise HTTPException(404, "Este gráfico ya no forma parte del tablero. Actualizá la página.")
