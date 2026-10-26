@@ -46,6 +46,18 @@ class EngineTests(unittest.TestCase):
             with self.subTest(agg=agg):
                 self.assertAlmostEqual(chart(self.df, {**self.cfg, "aggregation": agg})["datasets"][0]["data"][0], value)
 
+    def test_no_aggregation_requires_one_value_per_category_and_series(self):
+        frame, _ = table([["Mes", "Valor"], ["Enero", 42.4], ["Febrero", 44.7]])
+        result = chart(frame, {**self.cfg, "x_col": "Mes", "aggregation": "none"})
+        self.assertEqual(result["datasets"][0]["data"], [42.4, 44.7])
+        with self.assertRaisesRegex(DataError, "Sin agregar requiere un solo valor"):
+            chart(self.df, {**self.cfg, "aggregation": "none"})
+
+    def test_chart_specific_filters_are_applied_in_addition_to_saved_filters(self):
+        result = chart(self.df, {**self.cfg, "filters": {"Mes": ["1"]}, "chart_filters": {"Grupo": ["B"]}})
+        self.assertEqual(result["filtered_rows"], 1)
+        self.assertEqual(result["datasets"][0]["data"], [8])
+
     def test_every_chart_type(self):
         for kind in CHART_TYPES:
             with self.subTest(kind=kind):
@@ -179,10 +191,15 @@ class EngineTests(unittest.TestCase):
 
     def test_chart_config_accepts_additional_metrics(self):
         config = api.ChartConfig.model_validate({
-            "sheet": "Datos", **self.cfg, "y_cols": ["Grupo"], "map_metric_cols": ["Valor", "Grupo"],
+            "sheet": "Datos", **self.cfg, "aggregation": "none", "y_cols": ["Grupo"],
+            "map_metric_cols": ["Valor", "Grupo"], "chart_filters": {"Grupo": ["A"]},
+            "value_formats": {"Valor": "#,##0.00'%'"},
         })
+        self.assertEqual(config.aggregation, "none")
         self.assertEqual(config.y_cols, ["Grupo"])
         self.assertEqual(config.map_metric_cols, ["Valor", "Grupo"])
+        self.assertEqual(config.chart_filters, {"Grupo": ["A"]})
+        self.assertEqual(config.value_formats, {"Valor": "#,##0.00'%'"})
 
     def test_chart_config_validates_pie_label_mode(self):
         default = api.ChartConfig.model_validate({"sheet": "Datos", **self.cfg})

@@ -419,7 +419,7 @@ def chart(frame, cfg):
     metrics = list(dict.fromkeys(column for column in [y, *additional_metrics] if column))
     multiple_metrics = kind in MULTI_METRIC_CHART_TYPES and agg != "count" and len(metrics) > 1
     active_metrics = metrics if multiple_metrics else [y]
-    if kind not in CHART_TYPES or agg not in {"sum", "mean", "median", "min", "max", "count", "distinct"}:
+    if kind not in CHART_TYPES or agg not in {"none", "sum", "mean", "median", "min", "max", "count", "distinct"}:
         raise DataError("Tipo de gráfico u operación no válido.")
     if kind == "map":
         latitude = cfg.get("latitude_col", "")
@@ -432,6 +432,7 @@ def chart(frame, cfg):
         if mode not in {"markers", "circles"} or any(column not in frame for column in required):
             raise DataError("Elegí columnas válidas de latitud y longitud para el mapa.")
         frame = filter_frame(frame.copy(), cfg.get("filters", {}))
+        frame = filter_frame(frame, cfg.get("chart_filters", {}))
         rows = len(frame)
         if rows > MAX_MAP_POINTS:
             raise DataError("El mapa supera 2.000 puntos. Aplicá filtros antes de generarlo.")
@@ -472,6 +473,7 @@ def chart(frame, cfg):
         raise DataError("Elegí columnas válidas para este gráfico.")
     frame = frame.copy()
     frame = filter_frame(frame, cfg.get("filters", {}))
+    frame = filter_frame(frame, cfg.get("chart_filters", {}))
     rows = len(frame)
     warnings = []
     if kind == "table":
@@ -505,6 +507,10 @@ def chart(frame, cfg):
                 results[metric] = grouped[metric].nunique()
             elif agg == "sum":
                 results[metric] = grouped[metric].sum(min_count=1)
+            elif agg == "none":
+                if (grouped[metric].count() > 1).any():
+                    raise DataError(f"Sin agregar requiere un solo valor de '{metric}' por categoría y serie. Aplicá un filtro, separá otra serie o elegí una operación.")
+                results[metric] = grouped[metric].first()
             else:
                 results[metric] = getattr(grouped[metric], agg)()
         labels = sort_group_values(aggregate_frame, x, cfg.get("category_sort"))
@@ -568,6 +574,10 @@ def chart(frame, cfg):
         result = grouped[y].nunique()
     elif agg == "sum":
         result = grouped[y].sum(min_count=1)
+    elif agg == "none":
+        if (grouped[y].count() > 1).any():
+            raise DataError("Sin agregar requiere un solo valor por categoría y serie. Aplicá un filtro, separá otra serie o elegí una operación.")
+        result = grouped[y].first()
     else:
         result = getattr(grouped[y], agg)()
     if len(result) > MAX_POINTS:
@@ -596,6 +606,11 @@ def chart(frame, cfg):
             value = int(frame[y].nunique())
         elif agg == "sum":
             value = safe(frame[y].sum(min_count=1))
+        elif agg == "none":
+            values = [safe(value) for value in frame[y] if safe(value) is not None]
+            if len(values) > 1:
+                raise DataError("Sin agregar requiere un único valor después de aplicar los filtros.")
+            value = values[0] if values else None
         else:
             value = safe(getattr(frame[y], agg)())
         return {"labels": ["Total"], "datasets": [{"label": agg, "data": [value]}], "filtered_rows": rows, "warnings": warnings}

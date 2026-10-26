@@ -288,7 +288,7 @@ class SortConfig(BaseModel):
 
 class ChartConfig(ReadConfig):
     chart_type: str = "bar"
-    aggregation: str = "sum"
+    aggregation: str = Field(default="sum", pattern=r"^(none|sum|mean|median|min|max|count|distinct)$")
     x_col: str = ""
     y_col: str = ""
     y_cols: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=19)
@@ -296,6 +296,8 @@ class ChartConfig(ReadConfig):
     group_col: str = ""
     date_bucket: str = "none"
     filters: dict[str, list[str]] = Field(default_factory=dict)
+    chart_filters: dict[str, list[str]] = Field(default_factory=dict, max_length=20)
+    value_formats: dict[str, str] = Field(default_factory=dict, max_length=20)
     category_sort: SortConfig | None = None
     series_sort: SortConfig | None = None
     latitude_col: str = Field(default="", max_length=500)
@@ -304,6 +306,23 @@ class ChartConfig(ReadConfig):
     size_col: str = Field(default="", max_length=500)
     map_mode: str = Field(default="markers", pattern=r"^(markers|circles)$")
     map_metric_cols: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=20)
+
+    @field_validator("chart_filters")
+    @classmethod
+    def validate_chart_filters(cls, filters):
+        if any(not column.strip() or len(column) > 500 or len(values) > 100 or
+               any(not isinstance(value, str) or len(value) > 2000 for value in values)
+               for column, values in filters.items()):
+            raise ValueError("Los filtros personalizados no son válidos.")
+        return filters
+
+    @field_validator("value_formats")
+    @classmethod
+    def validate_value_formats(cls, formats):
+        if any(not column.strip() or len(column) > 500 or not value.strip() or len(value) > 100
+               for column, value in formats.items()):
+            raise ValueError("Los formatos personalizados no son válidos.")
+        return formats
 
 def load_table(source_id, owner, config, google_token):
     doc = source_for(source_id, owner)
@@ -420,12 +439,13 @@ def render_snapshot_widget(widget: dict, snapshot: SectionSnapshot, filters: dic
     config = ChartConfig.model_validate(widget["config"])
     frame, metadata = snapshot.tables[read_config_key(config)]
     frame = filter_frame(frame, config.filters)
+    frame = filter_frame(frame, config.chart_filters)
     applicable = {column: selection for column, selection in filters.items() if column in frame.columns}
     options = contextual_filter_options(frame, allowed, applicable, filter_sorts)
     for column, option in options.items():
         option["type"] = metadata["column_meta"][column]["type"]
     filtered_frame = apply_view_filters(frame, applicable)
-    result = chart(filtered_frame, {**config.model_dump(), "filters": {}})
+    result = chart(filtered_frame, {**config.model_dump(), "filters": {}, "chart_filters": {}})
     result["filter_options"] = options
     result["ignored_filters"] = [column for column, selection in filters.items()
                                  if filter_selection(selection)[1] and column not in frame.columns]
@@ -737,6 +757,7 @@ def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
         google_token = google_token or google_oauth.access_token(db(), owner)
     frame, metadata = table_from_source(source, config, google_token)
     frame = filter_frame(frame, config.filters)
+    frame = filter_frame(frame, config.chart_filters)
     configured_columns = workspace.get("filter_columns")
     if configured_columns is not None:
         allowed = set(configured_columns)
@@ -757,7 +778,7 @@ def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
     for column, option in options.items():
         option['type'] = metadata['column_meta'][column]['type']
     filtered_frame = apply_view_filters(frame, applicable)
-    result = chart(filtered_frame, {**config.model_dump(), "filters": {}})
+    result = chart(filtered_frame, {**config.model_dump(), "filters": {}, "chart_filters": {}})
     result["filter_options"] = options
     result["ignored_filters"] = [column for column, selection in filters.items()
                                  if filter_selection(selection)[1] and column not in frame.columns]

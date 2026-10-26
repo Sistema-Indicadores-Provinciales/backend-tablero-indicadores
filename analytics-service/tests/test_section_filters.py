@@ -90,6 +90,14 @@ class SectionFilterTests(unittest.TestCase):
         self.assertEqual(self.query(filters={'Año': ['2025']}).json()['filtered_rows'], 0)
         self.assertEqual(self.db.analytics_workspaces.find_one(), original)
 
+    def test_chart_specific_filter_only_restricts_its_widget(self):
+        self.db.analytics_workspaces.update_one({}, {'$set': {
+            'widgets.1.config.chart_filters': {'Tipo': ['A']},
+        }})
+        self.assertEqual(self.query('monthly').json()['datasets'][0]['data'], [15, 20])
+        self.assertEqual(self.query('total').json()['datasets'][0]['data'], [10])
+        self.assertEqual(self.query('total', {'Mes': ['Febrero']}).json()['filtered_rows'], 0)
+
     def test_unconfigured_measure_and_private_columns_cannot_be_requested(self):
         for column in ['Total', 'Interno', 'No existe']:
             self.assertEqual(self.query(filters={column: ['10']}).status_code, 422)
