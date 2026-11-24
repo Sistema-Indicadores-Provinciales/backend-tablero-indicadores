@@ -54,7 +54,15 @@ test('deleting a user also removes their stored Google authorization', async () 
   const collection = jest.fn().mockReturnValue({ deleteOne: removeGrant });
   const users = { findOneAndDelete: jest.fn().mockResolvedValue({ _id: id }), db: { collection } };
   const service = new UserService(users as any, {} as any);
-  await service.deleteUser('Ana', 'ana@example.test');
+  await service.deleteUser('Ana');
+  expect(users.findOneAndDelete).toHaveBeenCalledWith({ username: 'Ana' });
   expect(collection).toHaveBeenCalledWith('analytics_google_connections');
   expect(removeGrant).toHaveBeenCalledWith({ _id: id.toString() });
+});
+
+test.each([undefined, null, '', '   ', { $ne: null }])('does not delete without a valid username: %p', async username => {
+  const users = { findOneAndDelete: jest.fn() };
+  const service = new UserService(users as any, {} as any);
+  await expect(service.deleteUser(username as any)).rejects.toThrow('Indicá el usuario');
+  expect(users.findOneAndDelete).not.toHaveBeenCalled();
 });

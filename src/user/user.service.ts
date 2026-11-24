@@ -1,5 +1,5 @@
 import * as bcrypt from 'bcryptjs';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument } from './user.schema';
 import { Model, Types } from 'mongoose';
@@ -16,15 +16,18 @@ export class UserService {
     return this.userModel.find().exec();
   }
 
-  async createNewUser(username: string, password: string, email: string, profileType: string) {
+  async createNewUser(username: string, password: string, profileType: string) {
     const salt = bcrypt.genSaltSync(10);
     const hashedPassword = bcrypt.hashSync(password, salt);
-    const newUser = new this.userModel({ username, password: hashedPassword, email, profileType });
+    const newUser = new this.userModel({ username, password: hashedPassword, profileType });
     return newUser.save();
   }
 
-  async deleteUser(username: string, email: string): Promise<{ message: string }> {
-    const user = await this.userModel.findOneAndDelete({ username, email });
+  async deleteUser(username: string): Promise<{ message: string }> {
+    if (typeof username !== 'string' || !username.trim()) {
+      throw new BadRequestException('Indicá el usuario que querés eliminar.');
+    }
+    const user = await this.userModel.findOneAndDelete({ username });
     if (!user) {
       throw new Error('Usuario no encontrado.');
     }

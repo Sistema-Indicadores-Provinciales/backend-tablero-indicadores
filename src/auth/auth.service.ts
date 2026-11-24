@@ -78,9 +78,9 @@ export class AuthService {
   }
 
 
-  async register(username: string, password: string, email: string, profileType: string) {
+  async register(username: string, password: string, profileType: string) {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = new this.userModel({ username, password: hashedPassword, email, profileType });
+    const newUser = new this.userModel({ username, password: hashedPassword, profileType });
     await newUser.save();
     return { _id: newUser._id, username: newUser.username };
   }

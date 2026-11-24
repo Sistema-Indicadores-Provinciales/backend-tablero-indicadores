@@ -1,18 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 
-describe('AuthController', () => {
-  let controller: AuthController;
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [AuthController],
-    }).compile();
-
-    controller = module.get<AuthController>(AuthController);
-  });
-
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
+test('admin registration no longer forwards an email from old clients', async () => {
+  const service = { register: jest.fn().mockResolvedValue({ username: 'Ana' }) };
+  const controller = new AuthController(service as any, {} as any);
+  await controller.register({ username: 'Ana', password: 'test-password', profileType: 'ADMIN', email: 'old@example.test' });
+  expect(service.register).toHaveBeenCalledWith('Ana', 'test-password', 'ADMIN');
 });

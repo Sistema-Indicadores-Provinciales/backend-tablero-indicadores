@@ -73,7 +73,7 @@ export class AuthController {
   @UseGuards(AdminGuard)
   @Post('register')
   async register(@Body() body: any) {
-    const { username, password, email, profileType } = body;
-    return this.authService.register(username, password, email, profileType);
+    const { username, password, profileType } = body;
+    return this.authService.register(username, password, profileType);
   }
 }
