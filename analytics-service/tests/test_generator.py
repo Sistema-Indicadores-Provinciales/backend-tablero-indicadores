@@ -18,6 +18,20 @@ from app import generator as api
 from main import app
 
 class EngineTests(unittest.TestCase):
+    def test_xlsx_without_optional_dimensions(self):
+        # Streaming workbooks, including Google exports, may omit <dimension>.
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'google-export.xlsx'
+            workbook = Workbook(write_only=True)
+            sheet = workbook.create_sheet('Tasas')
+            sheet.append(['Año', 'Tasa'])
+            sheet.append([2025, 6.4])
+            workbook.save(path)
+            self.assertEqual(read_rows(path, 'Tasas'), [['Año', 'Tasa'], [2025, 6.4]])
+            with patch('app.data_engine.MAX_ROWS', 1):
+                with self.assertRaises(DataError):
+                    read_rows(path, 'Tasas')
+
     def setUp(self):
         self.rows = [["Mes", "Valor", "Grupo"], [2, 0, "A"], [1, 10, "A"], [1, 20, "A"], [1, 8, "B"], [2, None, "B"]]
         self.df, self.meta = table(self.rows)
