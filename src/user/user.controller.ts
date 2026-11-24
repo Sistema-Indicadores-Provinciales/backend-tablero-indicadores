@@ -1,6 +1,6 @@
 import { AdminGuard } from '../auth/admin.guard';
 import { Body, Controller, Delete, Get, HttpException, HttpStatus, Param, Post, Put, Request, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { JwtAuthGuard } from '../auth/auth.guard';
 import { User, UserDocument } from './user.schema';
 import { UserService } from './user.service';
 
@@ -18,16 +18,16 @@ export class UserController {
   @UseGuards(AdminGuard)
   @Post()
   async createNewUser(@Body() body: any) {
-    const { username, password, email, profileType } = body;
-    return this.userService.createNewUser(username, password, email, profileType);
+    const { username, password, profileType } = body;
+    return this.userService.createNewUser(username, password, profileType);
   }
 
   @UseGuards(AdminGuard)
   @Delete()
   async deleteUser(@Body() body: any) {
-    const { username, email } = body;
+    const { username } = body;
     try {
-      return await this.userService.deleteUser(username, email);
+      return await this.userService.deleteUser(username);
     } catch (error) {
       throw new HttpException(
         error.message || 'Error al eliminar el usuario',
@@ -42,7 +42,7 @@ export class UserController {
     try {
       const users = await this.userService.getAllUsers();
       return users.map((user: any) => {
-        const { password, refreshToken, ...safe } = user.toObject ? user.toObject() : user;
+        const { password, refreshToken, email, ...safe } = user.toObject ? user.toObject() : user;
         return safe;
       });
     } catch (error) {
