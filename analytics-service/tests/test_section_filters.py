@@ -74,6 +74,23 @@ class SectionFilterTests(unittest.TestCase):
         self.assertIn('Actualizar datos', response.json()['detail'])
         read.assert_not_called()
 
+    def test_facets_reused_only_with_identical_chart_restrictions_and_current_filters(self):
+        with patch.object(api, 'contextual_filter_options', wraps=api.contextual_filter_options) as facets:
+            first = self.render().json()
+            self.assertEqual(facets.call_count, 1)
+            filtered = self.render({'Mes': ['Enero']}, first['snapshot_id']).json()
+            self.assertEqual(facets.call_count, 2)
+            self.assertEqual(filtered['widgets']['total']['data']['datasets'][0]['data'], [15])
+        api.snapshots.discard(first['snapshot_id'])
+        self.db.analytics_workspaces.update_one({}, {'$set': {'widgets.1.config.filter_rules': [
+            {'column': 'Tipo', 'operator': 'equal', 'value': 'A'}]}})
+        with patch.object(api, 'contextual_filter_options', wraps=api.contextual_filter_options) as facets:
+            restricted = self.render().json()
+            self.assertEqual(facets.call_count, 2)
+            self.assertEqual(restricted['widgets']['total']['data']['filter_options']['Tipo']['values'], ['A'])
+            self.assertEqual(restricted['widgets']['monthly']['data']['filter_options']['Tipo']['values'], ['A', 'B'])
+        api.snapshots.discard(restricted['snapshot_id'])
+
     def test_year_and_month_apply_to_indicator_and_all_charts_without_changing_saved_data(self):
         original = copy.deepcopy(self.db.analytics_workspaces.find_one())
         for widget in self.widgets:
@@ -182,3 +199,40 @@ class SectionFilterTests(unittest.TestCase):
             self.assertEqual(self.query(filters={'Año': ['2026']}).status_code, 404)
             self.assertEqual(self.render(filters={'Año': ['2026']}).status_code, 404)
             read.assert_not_called()
+
+    def test_control_rules_limit_choices_without_changing_chart_totals_or_saved_restrictions(self):
+        rules = [{'column': 'Tipo', 'operator': 'not_contains', 'value': 'B'}]
+        self.db.analytics_workspaces.update_one({}, {'$set': {'filter_option_rules': rules}})
+        for filters, expected in [({}, 35), ({'Mes': ['Enero']}, 15), ({'Tipo': ['B']}, 25)]:
+            single = self.query(filters=filters)
+            response = self.render(filters)
+            self.assertEqual(single.status_code, 200, single.text)
+            self.assertEqual(response.status_code, 200, response.text)
+            body = response.json()
+            try:
+                self.assertEqual(body['filter_options']['Tipo']['values'], ['A'])
+                for data in [single.json(), body['widgets']['total']['data']]:
+                    self.assertEqual(data['datasets'][0]['data'], [expected])
+                    self.assertEqual(data['filter_options']['Tipo']['values'], ['A'])
+                    self.assertEqual(data['filter_options']['Año']['values'], [] if filters.get('Tipo') else ['2026'])
+            finally:
+                api.snapshots.discard(body['snapshot_id'])
+
+    def test_control_rules_persist_and_invalidate_previously_loaded_options(self):
+        initial = self.render().json()
+        payload = {'name': 'Sección', 'source_id': 'private-file', 'widgets': self.widgets,
+                   'filter_columns': ['Año', 'Mes', 'Tipo'],
+                   'filter_option_rules': [{'column': 'Tipo', 'operator': 'not_equal', 'value': 'B'}]}
+        url = '/v2/workspaces/workspace-a'
+        self.assertEqual(self.client.put(url, headers=self.headers(self.viewer), json=payload).status_code, 404)
+        saved = self.client.put(url, headers=self.headers(self.owner), json=payload)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(self.client.get(url, headers=self.headers(self.owner)).json()['filter_option_rules'],
+                         api.Workspace.model_validate(payload).model_dump()['filter_option_rules'])
+        try:
+            self.assertEqual(self.render(snapshot_id=initial['snapshot_id']).status_code, 409)
+        finally:
+            api.snapshots.discard(initial['snapshot_id'])
+        for rules in [[{'column': 'Tipo', 'operator': 'execute', 'value': ''}], payload['filter_option_rules'] * 51]:
+            payload['filter_option_rules'] = rules
+            self.assertEqual(self.client.put(url, headers=self.headers(self.owner), json=payload).status_code, 422)

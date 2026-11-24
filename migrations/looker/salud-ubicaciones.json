@@ -1,0 +1,1811 @@
+{
+  "reviewed_at": "2026-11-19",
+  "sources": [
+    "https://apis.datos.gob.ar/georef/api/v2.0/localidades?provincia=34&max=1000&campos=completo",
+    "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?provincia=34&max=1000&campos=completo",
+    "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip",
+    "https://snop-ppo.obraspublicas.gob.ar/localities/details/903c278f-afb2-4e66-ade0-36ea194fedd6",
+    "https://m.formosa.gob.ar/modulos/acciones/templates/files/2013/ministerio_dh.pdf",
+    "https://archivos.formosa.gob.ar/media/uploads/obras_acciones/pdf_1551412182.pdf",
+    "https://fd.formosa.gob.ar/puntosconectados",
+    "https://archivos.formosa.gob.ar/media/uploads/obras_acciones/pdf_1740838581.pdf",
+    "https://www.openstreetmap.org/copyright"
+  ],
+  "area_reference_policy": "Centros de salud como referencia del área, autorizado el 18/11/2026. No representan sus límites.",
+  "maps": {
+    "efectores-localidad": {
+      "column": "LOCALIDAD",
+      "locations": {
+        "Bartolome de las Casas": {
+          "lat": -25.408047924,
+          "lng": -59.570759592,
+          "name": "Bartolomé de las Casas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035010"
+        },
+        "Clorinda": {
+          "lat": -25.286080881,
+          "lng": -57.7224082,
+          "name": "Clorinda",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049010"
+        },
+        "El Chorro": {
+          "lat": -23.183829531,
+          "lng": -62.306572015,
+          "name": "General Mosconi",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063020"
+        },
+        "El Colorado": {
+          "lat": -26.309061021,
+          "lng": -59.372308046,
+          "name": "El Colorado",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056020"
+        },
+        "El Espinillo": {
+          "lat": -24.981482853,
+          "lng": -58.552561591,
+          "name": "El Espinillo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042020"
+        },
+        "El Potrillo": {
+          "lat": -23.16244021,
+          "lng": -62.008962864,
+          "name": "El Potrillo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063010"
+        },
+        "El Quebracho": {
+          "lat": -23.342517804,
+          "lng": -61.871584013,
+          "name": "El Quebracho",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063030"
+        },
+        "Estanislao del Campo": {
+          "lat": -25.053546274,
+          "lng": -60.090638521,
+          "name": "Estanislao del Campo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035050"
+        },
+        "Fontana": {
+          "lat": -25.330640381,
+          "lng": -59.680989769,
+          "name": "Comandante Fontana",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035030"
+        },
+        "Formosa": {
+          "lat": -26.185008983,
+          "lng": -58.174896483,
+          "name": "Formosa",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014020"
+        },
+        "Fortin Cabo 1° Lugones": {
+          "lat": -24.286422629,
+          "lng": -59.8276786,
+          "name": "Fortín Cabo 1º Lugones",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035060"
+        },
+        "General Belgrano": {
+          "lat": -24.938533856,
+          "lng": -59.026389294,
+          "name": "Villa General Manuel Belgrano",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035170"
+        },
+        "General Guemes": {
+          "lat": -24.755783305,
+          "lng": -59.48851006,
+          "name": "Villa General Güemes",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035160"
+        },
+        "Gran Guardia": {
+          "lat": -25.862762272,
+          "lng": -58.885728596,
+          "name": "Gran Guardia",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014030"
+        },
+        "Guadalcazar": {
+          "lat": -23.672947932,
+          "lng": -61.163607603,
+          "name": "Guadalcazar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007005"
+        },
+        "Herradura": {
+          "lat": -26.48984781,
+          "lng": -58.311618191,
+          "name": "Herradura",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021030"
+        },
+        "Ibarreta": {
+          "lat": -25.214499757,
+          "lng": -59.858892437,
+          "name": "Ibarreta",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035080"
+        },
+        "Ingeniero Juaréz": {
+          "lat": -23.90373915,
+          "lng": -61.842429269,
+          "name": "Ingeniero Guillermo N. Juárez",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34028010"
+        },
+        "La Pantalla": {
+          "lat": -24.7168572,
+          "lng": -60.5808393,
+          "name": "La Pantalla (Las Lomitas)",
+          "reference": "https://www.openstreetmap.org/node/6795525632",
+          "note": "Punto de referencia de la localidad, no de un establecimiento individual."
+        },
+        "La Primavera": {
+          "lat": -25.203471336,
+          "lng": -58.25367331,
+          "name": "La Primavera",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049A16"
+        },
+        "La Rinconada": {
+          "lat": -23.494796161,
+          "lng": -61.576653565,
+          "name": "La Rinconada",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007007"
+        },
+        "Laguna Blanca": {
+          "lat": -25.126264296,
+          "lng": -58.240457282,
+          "name": "Laguna Blanca",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049020"
+        },
+        "Laguna Naick Neck": {
+          "lat": -25.22273689,
+          "lng": -58.12101582,
+          "name": "Laguna Naick-Neck",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049030"
+        },
+        "Laguna Yema": {
+          "lat": -24.255524629,
+          "lng": -61.241985111,
+          "name": "Laguna Yema",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007010"
+        },
+        "Lamadrid": {
+          "lat": -23.896946974,
+          "lng": -60.754546867,
+          "name": "Lamadrid",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007015"
+        },
+        "Las Lomitas": {
+          "lat": -24.708135606,
+          "lng": -60.591376883,
+          "name": "Las Lomitas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035100"
+        },
+        "Los Chiriguanos": {
+          "lat": -24.098814349,
+          "lng": -61.461974295,
+          "name": "Los Chiriguanos",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007020"
+        },
+        "Lote 8": {
+          "lat": -22.841317693,
+          "lng": -62.276959501,
+          "name": "Lote 8",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063A27"
+        },
+        "Lucio General Mansilla": {
+          "lat": -26.657689509,
+          "lng": -58.630460262,
+          "name": "General Lucio V. Mansilla",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021020"
+        },
+        "Maria Cristina": {
+          "lat": -22.738196249,
+          "lng": -62.275395414,
+          "name": "MARIA CRISTINA",
+          "reference": "https://snop-ppo.obraspublicas.gob.ar/localities/details/903c278f-afb2-4e66-ade0-36ea194fedd6"
+        },
+        "Mision Laishi": {
+          "lat": -26.243867035,
+          "lng": -58.629613052,
+          "name": "San Francisco de Laishi",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021040"
+        },
+        "Mision Taacagle": {
+          "lat": -24.980999991,
+          "lng": -58.819934389,
+          "name": "Misión Tacaaglé",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042040"
+        },
+        "Mojón de Fierro": {
+          "lat": -26.033189506,
+          "lng": -58.049051,
+          "name": "Mojón de Fierro",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014050"
+        },
+        "Palo Santo": {
+          "lat": -25.564593878,
+          "lng": -59.337719095,
+          "name": "Palo Santo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056030"
+        },
+        "Pastoril": {
+          "lat": -25.672693191,
+          "lng": -58.261494859,
+          "name": "Colonia Pastoril",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014010"
+        },
+        "Pirané": {
+          "lat": -25.732649819,
+          "lng": -59.109808063,
+          "name": "Pirané",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056040"
+        },
+        "Posta Cambio Zalazar": {
+          "lat": -24.210788936,
+          "lng": -60.197262428,
+          "name": "Posta Cambio Zalazar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035110"
+        },
+        "Pozo de Maza": {
+          "lat": -23.570321915,
+          "lng": -61.708060029,
+          "name": "Pozo de Maza",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007030"
+        },
+        "Pozo del Tigre": {
+          "lat": -24.895553545,
+          "lng": -60.319184515,
+          "name": "Pozo del Tigre",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035120"
+        },
+        "Puerto Pilcomayo": {
+          "lat": -25.372224407,
+          "lng": -57.651606485,
+          "name": "Puerto Pilcomayo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049050"
+        },
+        "Riacho He He": {
+          "lat": -25.360656781,
+          "lng": -58.279795911,
+          "name": "Riacho He-He",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049060"
+        },
+        "San Hilario": {
+          "lat": -26.029992112,
+          "lng": -58.652255708,
+          "name": "San Hilario",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014060"
+        },
+        "San Martin II": {
+          "lat": -24.433734103,
+          "lng": -59.654904791,
+          "name": "San Martín II",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035140"
+        },
+        "Siete Palmas": {
+          "lat": -25.203691143,
+          "lng": -58.332003225,
+          "name": "Siete Palmas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049080"
+        },
+        "Subteniente Perin": {
+          "lat": -25.535408824,
+          "lng": -60.018824327,
+          "name": "Subteniente Perín",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035150"
+        },
+        "Tatané": {
+          "lat": -26.398152825,
+          "lng": -58.357336954,
+          "name": "Tatané",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021050"
+        },
+        "Tres Lagunas": {
+          "lat": -25.216124037,
+          "lng": -58.513078609,
+          "name": "Tres Lagunas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042060"
+        },
+        "Villa Dos Trece": {
+          "lat": -26.187165695,
+          "lng": -59.367155479,
+          "name": "Villa Kilómetro 213",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056050"
+        },
+        "Villa Escolar": {
+          "lat": -26.621916792,
+          "lng": -58.669706677,
+          "name": "Villa Escolar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021060"
+        },
+        "Villafañe": {
+          "lat": -26.204686883,
+          "lng": -59.080025184,
+          "name": "Colonia Campo Villafañe",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056010"
+        }
+      },
+      "pending": [],
+      "non_point_groups": {}
+    },
+    "prest-efectores": {
+      "column": "EFECTOR",
+      "locations": {
+        "C.R. Hosp. El Colorado Dr. Traverso": {
+          "lat": -26.3087165,
+          "lng": -59.36797360000003,
+          "name": "HOSPITAL PROVINCIAL DR. SANTIAGO OPIZZO TRAVERSO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340562147035"
+        },
+        "C.R. Hospital Clorinda - Felipe Cruz Arnedo": {
+          "lat": -25.28692117716442,
+          "lng": -57.72010803222656,
+          "name": "HOSPITAL PROVINCIAL DR. CRUZ FELIPE ARNEDO - CLORINDA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340492147039"
+        },
+        "C.R. Hospital Colonia Pastoril": {
+          "lat": -25.673711282473864,
+          "lng": -58.25157165527344,
+          "name": "CENTRO DE SALUD COLONIA PASTORIL",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340142147032"
+        },
+        "C.R. Hospital Comandante Fontana": {
+          "lat": -25.327890430844278,
+          "lng": -59.67979431152344,
+          "name": "HOSPITAL PROVINCIAL COMANDANTE FONTANA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340352147033"
+        },
+        "C.R. Hospital Distrital Las Lomitas": {
+          "lat": -24.702085,
+          "lng": -60.5933,
+          "name": "HOSPITAL PROVINCIAL LAS LOMITAS",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340352147047"
+        },
+        "C.R. Hospital El Chorro": {
+          "lat": -23.18781520693473,
+          "lng": -62.31270432472229,
+          "name": "HOSPITAL EL CHORRO (GRAL. MOSCONI)",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340632147030"
+        },
+        "C.R. Hospital El Espinillo": {
+          "lat": -24.9648951865082,
+          "lng": -58.55712890625,
+          "name": "HOSPITAL PROVINCIAL EL ESPINILLO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340422147036"
+        },
+        "C.R. Hospital El Potrillo": {
+          "lat": -23.15778,
+          "lng": -62.00403,
+          "name": "HOSPITAL PROVINCIAL EL POTRILLO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340632147026"
+        },
+        "C.R. Hospital Estanislao Del Campo": {
+          "lat": -25.049524663765407,
+          "lng": -60.0897216796875,
+          "name": "HOSPITAL PROVINCIAL ESTANISLAO DEL CAMPO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340352147037"
+        },
+        "C.R. Hospital Fortin Cabo 1º Lugones": {
+          "lat": -24.31706530687603,
+          "lng": -59.8370361328125,
+          "name": "HOSPITAL PROVINCIAL FORTIN CABO PRIMERO LUGONES",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340352147040"
+        },
+        "C.R. Hospital General Belgrano": {
+          "lat": -24.93252145867791,
+          "lng": -59.03228759765625,
+          "name": "HOSPITAL PROVINCIAL GENERAL MANUEL BELGRANO.",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340352147041"
+        },
+        "C.R. Hospital General Guemes": {
+          "lat": -24.736853484770677,
+          "lng": -59.49371337890625,
+          "name": "HOSPITAL PROVINCIAL VILLA GENERAL GUEMES",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340352147060"
+        },
+        "C.R. Hospital Ibarreta": {
+          "lat": -25.2093818,
+          "lng": -59.85857950000002,
+          "name": "HOSPITAL PROVINCIAL IBARRETA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340352147044"
+        },
+        "C.R. Hospital Ingeniero Juarez (Eva Perón)": {
+          "lat": -23.89964937898632,
+          "lng": -61.85028076171875,
+          "name": "HOSPITAL DISTRITAL INGENIERO JUAREZ EVA PERON",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340282147038"
+        },
+        "C.R. Hospital Laguna Blanca": {
+          "lat": -25.12787928859755,
+          "lng": -58.26805114746094,
+          "name": "HOSPITAL DE LAGUNA BLANCA - PEDRO EUCLIDES INSFRAN",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340492147055"
+        },
+        "C.R. Hospital Laguna Naick Neck": {
+          "lat": -25.207426209065783,
+          "lng": -58.124542236328125,
+          "name": "HOSPITAL PROVINCIAL LAGUNA NAICK NECK",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340492147045"
+        },
+        "C.R. Hospital Laguna Yema": {
+          "lat": -24.260111392072126,
+          "lng": -61.24259948730469,
+          "name": "HOSPITAL PROVINCIAL LAGUNA YEMA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340072147046"
+        },
+        "C.R. Hospital Los Chiriguanos": {
+          "lat": -24.08784297028764,
+          "lng": -61.475372314453125,
+          "name": "HOSPITAL PROVINCIAL LOS CHIRIGUANOS",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340072147048"
+        },
+        "C.R. Hospital Mision Laishi": {
+          "lat": -26.241692799340115,
+          "lng": -58.629913330078125,
+          "name": "HOSPITAL PROVINCIAL MISION SAN FRANCISCO DE LAISHI",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340212147049"
+        },
+        "C.R. Hospital Mision Tacaagle Dr. R.Locharich": {
+          "lat": -24.97158677046404,
+          "lng": -58.82509231567383,
+          "name": "HOSPITAL PROVINCIAL DE MISION TACAAGLE - ROBERTO LONCHARICH",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340422147054"
+        },
+        "C.R. Hospital Palo Santo": {
+          "lat": -25.551114674237343,
+          "lng": -59.327545166015625,
+          "name": "HOSPITAL PROVINCIAL PALO SANTO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340562147050"
+        },
+        "C.R. Hospital Pozo Del Tigre": {
+          "lat": -24.902441,
+          "lng": -60.322292000000004,
+          "name": "HOSPITAL PROVINCIAL POZO DEL TIGRE",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340352147052"
+        },
+        "C.R. Hospital Riacho He He": {
+          "lat": -25.389938642388444,
+          "lng": -58.304443359375,
+          "name": "HOSPITAL PROVINCIAL RIACHO HE HE",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340492147053"
+        },
+        "C.R. Hospital San Martin 2": {
+          "lat": -24.427145340082046,
+          "lng": -59.65850830078125,
+          "name": "HOSPITAL PROVINCIAL SAN MARTIN Nº2",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340352147056"
+        },
+        "C.R. Hospital Subteniente Perin": {
+          "lat": -25.526332426464574,
+          "lng": -60.014190673828125,
+          "name": "HOSPITAL PROVINCIAL SUBTENIENTE PERIN",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340352147057"
+        },
+        "C.R. Hospital Tres Lagunas": {
+          "lat": -25.217,
+          "lng": -58.51099999999997,
+          "name": "HOSPITAL PROVINCIAL TRES LAGUNAS",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340422147058"
+        },
+        "C.R. Hospital Villa 213": {
+          "lat": -26.18809909773477,
+          "lng": -59.36084747314453,
+          "name": "CENTRO DE REFERENCIA HOSPITAL PROVINCIAL VILLA DOS TRECE",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340562147061"
+        },
+        "C.R. Hospital Villa Escolar": {
+          "lat": -26.62269,
+          "lng": -58.670349999999985,
+          "name": "HOSPITAL PROVINCIAL VILLA ESCOLAR",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340212147059"
+        },
+        "C.R. Hospital Villafañe Dr. Justo Mongelos": {
+          "lat": -26.207814593239636,
+          "lng": -59.05975341796875,
+          "name": "CENTRO DE REFERENCIA HOSPITAL VILLAFAÑE DR. JUSTO PASTOR MONGELOS",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340562147449"
+        },
+        "C.R. Hospital de Pirané": {
+          "lat": -25.731676342976527,
+          "lng": -59.10123109817505,
+          "name": "HOSPITAL DISTRITAL DE PIRANE",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340562147051"
+        },
+        "Hospital 2 de Abril": {
+          "lat": -26.17234740777639,
+          "lng": -58.19485902786255,
+          "name": "HOSPITAL DE DIA DEL BARRIO 2 DE ABRIL DR. ADOLFO LIPPMAN",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147135"
+        },
+        "Hospital Alta Complejidad": {
+          "lat": -26.18159071133514,
+          "lng": -58.188443183898926,
+          "name": "HOSPITAL  ALTA COMPLEJIDAD PTE. JUAN DOMINGO PERON",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340142147027"
+        },
+        "Hospital Central": {
+          "lat": -26.1891553,
+          "lng": -58.16819140000001,
+          "name": "HOSPITAL CENTRAL DE EMERGENCIA DR. RAMON CARRILLO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340142147672"
+        },
+        "Hospital Distrital Nº 8": {
+          "lat": -26.141277791642313,
+          "lng": -58.15767220800344,
+          "name": "Hospital Distrital Nº 8 Eva Perón",
+          "reference": "https://fd.formosa.gob.ar/puntosconectados#marker_12063"
+        },
+        "Hospital Interdistrital Evita": {
+          "lat": -26.1808727,
+          "lng": -58.1974285,
+          "name": "HOSPITAL INTERDISTRITAL EVITA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#10340142147955"
+        },
+        "Hospital Odontológico de Complejidad Integrada (HOCI)": {
+          "lat": -26.1706585,
+          "lng": -58.174953000000016,
+          "name": "HOSPITAL ODONTOLOGICO DE COMPLEJIDAD INTEGRADA (HOCI)",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147691"
+        },
+        "Hospital de la Madre Y El Niño": {
+          "lat": -26.193182318251033,
+          "lng": -58.17511796951294,
+          "name": "HOSPITAL DE LA MADRE Y EL NIÑO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#12340142147065"
+        },
+        "Hospital de la Madre Y La Mujer": {
+          "lat": -26.179056725,
+          "lng": -58.197111825,
+          "name": "Hospital de la Madre y la Mujer",
+          "reference": "https://www.openstreetmap.org/way/1467130652"
+        }
+      },
+      "pending": [],
+      "non_point_groups": {}
+    },
+    "covid-localidades": {
+      "column": "LOCALIZACIÓN",
+      "locations": {
+        "Buena Vista": {
+          "lat": -25.071500409,
+          "lng": -58.385528602,
+          "name": "Buena Vista",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042010"
+        },
+        "Clorinda": {
+          "lat": -25.286080881,
+          "lng": -57.7224082,
+          "name": "Clorinda",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049010"
+        },
+        "Colonia La Primavera": {
+          "lat": -25.203471336,
+          "lng": -58.25367331,
+          "name": "La Primavera",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049A16",
+          "note": "Localidad verificada con las coordenadas de la hoja CASOS ACTIVOS; se conserva el nombre original del registro."
+        },
+        "Colonia Primavera": {
+          "lat": -25.203471336,
+          "lng": -58.25367331,
+          "name": "La Primavera",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049A16",
+          "note": "Localidad verificada con las coordenadas de la hoja CASOS ACTIVOS; se conserva el nombre original del registro."
+        },
+        "Comandante Fontana": {
+          "lat": -25.330640381,
+          "lng": -59.680989769,
+          "name": "Comandante Fontana",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035030"
+        },
+        "El Chorro": {
+          "lat": -23.183829531,
+          "lng": -62.306572015,
+          "name": "General Mosconi",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063020"
+        },
+        "El Colorado": {
+          "lat": -26.309061021,
+          "lng": -59.372308046,
+          "name": "El Colorado",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056020"
+        },
+        "El Espinillo": {
+          "lat": -24.981482853,
+          "lng": -58.552561591,
+          "name": "El Espinillo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042020"
+        },
+        "El Potrillo": {
+          "lat": -23.16244021,
+          "lng": -62.008962864,
+          "name": "El Potrillo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063010"
+        },
+        "Estanislao del Campo": {
+          "lat": -25.053546274,
+          "lng": -60.090638521,
+          "name": "Estanislao del Campo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035050"
+        },
+        "Formosa": {
+          "lat": -26.185008983,
+          "lng": -58.174896483,
+          "name": "Formosa",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014020"
+        },
+        "General Belgrano": {
+          "lat": -24.938533856,
+          "lng": -59.026389294,
+          "name": "Villa General Manuel Belgrano",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035170"
+        },
+        "General Güemes": {
+          "lat": -24.755783305,
+          "lng": -59.48851006,
+          "name": "Villa General Güemes",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035160"
+        },
+        "General Mansilla": {
+          "lat": -26.657689509,
+          "lng": -58.630460262,
+          "name": "General Lucio V. Mansilla",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021020"
+        },
+        "Gran Guardia": {
+          "lat": -25.862762272,
+          "lng": -58.885728596,
+          "name": "Gran Guardia",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014030"
+        },
+        "Guadalcazar": {
+          "lat": -23.672947932,
+          "lng": -61.163607603,
+          "name": "Guadalcazar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007005"
+        },
+        "Herradura": {
+          "lat": -26.48984781,
+          "lng": -58.311618191,
+          "name": "Herradura",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021030"
+        },
+        "Ibarreta": {
+          "lat": -25.214499757,
+          "lng": -59.858892437,
+          "name": "Ibarreta",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035080"
+        },
+        "Ingeniero Juárez": {
+          "lat": -23.90373915,
+          "lng": -61.842429269,
+          "name": "Ingeniero Guillermo N. Juárez",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34028010"
+        },
+        "Laguna Blanca": {
+          "lat": -25.126264296,
+          "lng": -58.240457282,
+          "name": "Laguna Blanca",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049020"
+        },
+        "Laguna Naick Neck": {
+          "lat": -25.22273689,
+          "lng": -58.12101582,
+          "name": "Laguna Naick-Neck",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049030"
+        },
+        "Laguna Yema": {
+          "lat": -24.255524629,
+          "lng": -61.241985111,
+          "name": "Laguna Yema",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007010"
+        },
+        "Las Lomitas": {
+          "lat": -24.708135606,
+          "lng": -60.591376883,
+          "name": "Las Lomitas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035100"
+        },
+        "Lomas Senes": {
+          "lat": -25.867122847,
+          "lng": -59.217685251,
+          "name": "Loma Senés",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056A55"
+        },
+        "Los Chiringuanos": {
+          "lat": -24.098814349,
+          "lng": -61.461974295,
+          "name": "Los Chiriguanos",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007020"
+        },
+        "Lote 8": {
+          "lat": -22.841317693,
+          "lng": -62.276959501,
+          "name": "Lote 8",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063A27"
+        },
+        "Mayor Edmundo Villafañe": {
+          "lat": -26.204686883,
+          "lng": -59.080025184,
+          "name": "Colonia Campo Villafañe",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056010"
+        },
+        "Mayor Villafañe": {
+          "lat": -26.204686883,
+          "lng": -59.080025184,
+          "name": "Colonia Campo Villafañe",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056010"
+        },
+        "Misión Laishí": {
+          "lat": -26.243867035,
+          "lng": -58.629613052,
+          "name": "San Francisco de Laishi",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021040"
+        },
+        "Misión Tacaaglé": {
+          "lat": -24.980999991,
+          "lng": -58.819934389,
+          "name": "Misión Tacaaglé",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042040"
+        },
+        "Mojón de Fierro": {
+          "lat": -26.033189506,
+          "lng": -58.049051,
+          "name": "Mojón de Fierro",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014050"
+        },
+        "Palo Santo": {
+          "lat": -25.564593878,
+          "lng": -59.337719095,
+          "name": "Palo Santo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056030"
+        },
+        "Pirané": {
+          "lat": -25.732649819,
+          "lng": -59.109808063,
+          "name": "Pirané",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056040"
+        },
+        "Posta Cambio Zalazar": {
+          "lat": -24.210788936,
+          "lng": -60.197262428,
+          "name": "Posta Cambio Zalazar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035110"
+        },
+        "Pozo del Tigre": {
+          "lat": -24.895553545,
+          "lng": -60.319184515,
+          "name": "Pozo del Tigre",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035120"
+        },
+        "Riacho He Hé": {
+          "lat": -25.360656781,
+          "lng": -58.279795911,
+          "name": "Riacho He-He",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049060"
+        },
+        "San Hilario": {
+          "lat": -26.029992112,
+          "lng": -58.652255708,
+          "name": "San Hilario",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014060"
+        },
+        "San Martin II": {
+          "lat": -24.433734103,
+          "lng": -59.654904791,
+          "name": "San Martín II",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035140"
+        },
+        "San Martín II": {
+          "lat": -24.433734103,
+          "lng": -59.654904791,
+          "name": "San Martín II",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035140"
+        },
+        "Siete Palmas": {
+          "lat": -25.203691143,
+          "lng": -58.332003225,
+          "name": "Siete Palmas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049080"
+        },
+        "Subteniente Perin": {
+          "lat": -25.535408824,
+          "lng": -60.018824327,
+          "name": "Subteniente Perín",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035150"
+        },
+        "Tatané": {
+          "lat": -26.398152825,
+          "lng": -58.357336954,
+          "name": "Tatané",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021050"
+        },
+        "Tres Lagunas": {
+          "lat": -25.216124037,
+          "lng": -58.513078609,
+          "name": "Tres Lagunas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042060"
+        },
+        "Villa 213": {
+          "lat": -26.187165695,
+          "lng": -59.367155479,
+          "name": "Villa Kilómetro 213",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056050"
+        },
+        "Villa Escolar": {
+          "lat": -26.621916792,
+          "lng": -58.669706677,
+          "name": "Villa Escolar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021060"
+        },
+        "Villa escolar": {
+          "lat": -26.621916792,
+          "lng": -58.669706677,
+          "name": "Villa Escolar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021060"
+        }
+      },
+      "pending": [],
+      "non_point_groups": {}
+    },
+    "dengue-localidades": {
+      "column": "LOCALIDAD",
+      "locations": {
+        "7 PALMAS": {
+          "lat": -25.203691143,
+          "lng": -58.332003225,
+          "name": "Siete Palmas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049080"
+        },
+        "BARTOLOME DE LAS CASAS": {
+          "lat": -25.408047924,
+          "lng": -59.570759592,
+          "name": "Bartolomé de las Casas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035010"
+        },
+        "BUENA VISTA": {
+          "lat": -25.071500409,
+          "lng": -58.385528602,
+          "name": "Buena Vista",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042010"
+        },
+        "CLORINDA": {
+          "lat": -25.286080881,
+          "lng": -57.7224082,
+          "name": "Clorinda",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049010"
+        },
+        "CLORINDA ": {
+          "lat": -25.286080881,
+          "lng": -57.7224082,
+          "name": "Clorinda",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049010"
+        },
+        "CMTE FONTANA": {
+          "lat": -25.330640381,
+          "lng": -59.680989769,
+          "name": "Comandante Fontana",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035030"
+        },
+        "COLONIA PASTORIL": {
+          "lat": -25.672693191,
+          "lng": -58.261494859,
+          "name": "Colonia Pastoril",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014010"
+        },
+        "COMANDANTE FONTANA": {
+          "lat": -25.330640381,
+          "lng": -59.680989769,
+          "name": "Comandante Fontana",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035030"
+        },
+        "CTE. FONTANA": {
+          "lat": -25.330640381,
+          "lng": -59.680989769,
+          "name": "Comandante Fontana",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035030"
+        },
+        "EL CHORRO": {
+          "lat": -23.183829531,
+          "lng": -62.306572015,
+          "name": "General Mosconi",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063020"
+        },
+        "EL COLORADO": {
+          "lat": -26.309061021,
+          "lng": -59.372308046,
+          "name": "El Colorado",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056020"
+        },
+        "EL ESPINILLO": {
+          "lat": -24.981482853,
+          "lng": -58.552561591,
+          "name": "El Espinillo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042020"
+        },
+        "EL POTRILLO": {
+          "lat": -23.16244021,
+          "lng": -62.008962864,
+          "name": "El Potrillo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063010"
+        },
+        "EN HERRADURA": {
+          "lat": -26.48984781,
+          "lng": -58.311618191,
+          "name": "Herradura",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021030"
+        },
+        "EN VILLAFAÑE": {
+          "lat": -26.204686883,
+          "lng": -59.080025184,
+          "name": "Colonia Campo Villafañe",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056010"
+        },
+        "ESPINILLO": {
+          "lat": -24.981482853,
+          "lng": -58.552561591,
+          "name": "El Espinillo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042020"
+        },
+        "EST. DEL CAMPO": {
+          "lat": -25.053546274,
+          "lng": -60.090638521,
+          "name": "Estanislao del Campo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035050"
+        },
+        "ESTANISLAO DEL CAMPO": {
+          "lat": -25.053546274,
+          "lng": -60.090638521,
+          "name": "Estanislao del Campo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035050"
+        },
+        "FORGIN LUGONES": {
+          "lat": -24.286422629,
+          "lng": -59.8276786,
+          "name": "Fortín Cabo 1º Lugones",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035060"
+        },
+        "FORMOSA": {
+          "lat": -26.185008983,
+          "lng": -58.174896483,
+          "name": "Formosa",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014020"
+        },
+        "FORMOSA ": {
+          "lat": -26.185008983,
+          "lng": -58.174896483,
+          "name": "Formosa",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014020"
+        },
+        "FORMOSA CAPITAL": {
+          "lat": -26.185008983,
+          "lng": -58.174896483,
+          "name": "Formosa",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014020"
+        },
+        "FORTIN LUGONES": {
+          "lat": -24.286422629,
+          "lng": -59.8276786,
+          "name": "Fortín Cabo 1º Lugones",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035060"
+        },
+        "FORTÍN LUGONES": {
+          "lat": -24.286422629,
+          "lng": -59.8276786,
+          "name": "Fortín Cabo 1º Lugones",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035060"
+        },
+        "GENERAL BELGRANO": {
+          "lat": -24.938533856,
+          "lng": -59.026389294,
+          "name": "Villa General Manuel Belgrano",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035170"
+        },
+        "GENERAL GUEMEZ": {
+          "lat": -24.755783305,
+          "lng": -59.48851006,
+          "name": "Villa General Güemes",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035160"
+        },
+        "GENERAL MANSILLA": {
+          "lat": -26.657689509,
+          "lng": -58.630460262,
+          "name": "General Lucio V. Mansilla",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021020"
+        },
+        "GRAL.  MANSILLA": {
+          "lat": -26.657689509,
+          "lng": -58.630460262,
+          "name": "General Lucio V. Mansilla",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021020"
+        },
+        "GRAN GUARDIA": {
+          "lat": -25.862762272,
+          "lng": -58.885728596,
+          "name": "Gran Guardia",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014030"
+        },
+        "HERRADURA": {
+          "lat": -26.48984781,
+          "lng": -58.311618191,
+          "name": "Herradura",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021030"
+        },
+        "HERRADURA ": {
+          "lat": -26.48984781,
+          "lng": -58.311618191,
+          "name": "Herradura",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021030"
+        },
+        "IBARRETA": {
+          "lat": -25.214499757,
+          "lng": -59.858892437,
+          "name": "Ibarreta",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035080"
+        },
+        "INGENIERO JUÁREZ": {
+          "lat": -23.90373915,
+          "lng": -61.842429269,
+          "name": "Ingeniero Guillermo N. Juárez",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34028010"
+        },
+        "LA RINCONADA": {
+          "lat": -23.494796161,
+          "lng": -61.576653565,
+          "name": "La Rinconada",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007007"
+        },
+        "LAG . BLANCA": {
+          "lat": -25.126264296,
+          "lng": -58.240457282,
+          "name": "Laguna Blanca",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049020"
+        },
+        "LAG. BLANCA": {
+          "lat": -25.126264296,
+          "lng": -58.240457282,
+          "name": "Laguna Blanca",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049020"
+        },
+        "LAGUNA BLANCA": {
+          "lat": -25.126264296,
+          "lng": -58.240457282,
+          "name": "Laguna Blanca",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049020"
+        },
+        "LAGUNA NAICK NECK": {
+          "lat": -25.22273689,
+          "lng": -58.12101582,
+          "name": "Laguna Naick-Neck",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049030"
+        },
+        "LAGUNA YEMA": {
+          "lat": -24.255524629,
+          "lng": -61.241985111,
+          "name": "Laguna Yema",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007010"
+        },
+        "LAS LOMITAS": {
+          "lat": -24.708135606,
+          "lng": -60.591376883,
+          "name": "Las Lomitas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035100"
+        },
+        "MANSILLA ": {
+          "lat": -26.657689509,
+          "lng": -58.630460262,
+          "name": "General Lucio V. Mansilla",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021020"
+        },
+        "MISION LAISHI": {
+          "lat": -26.243867035,
+          "lng": -58.629613052,
+          "name": "San Francisco de Laishi",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021040"
+        },
+        "MISION LAISHÍ": {
+          "lat": -26.243867035,
+          "lng": -58.629613052,
+          "name": "San Francisco de Laishi",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021040"
+        },
+        "MISION LASIHI": {
+          "lat": -26.243867035,
+          "lng": -58.629613052,
+          "name": "San Francisco de Laishi",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021040"
+        },
+        "MISION TACAAGLE": {
+          "lat": -24.980999991,
+          "lng": -58.819934389,
+          "name": "Misión Tacaaglé",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042040"
+        },
+        "MISION TACAAGLÉ": {
+          "lat": -24.980999991,
+          "lng": -58.819934389,
+          "name": "Misión Tacaaglé",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042040"
+        },
+        "MISIÓN  TACAAGLÉ": {
+          "lat": -24.980999991,
+          "lng": -58.819934389,
+          "name": "Misión Tacaaglé",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042040"
+        },
+        "MISIÓN LAISHÍ": {
+          "lat": -26.243867035,
+          "lng": -58.629613052,
+          "name": "San Francisco de Laishi",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021040"
+        },
+        "MISIÓN TACAAGLE": {
+          "lat": -24.980999991,
+          "lng": -58.819934389,
+          "name": "Misión Tacaaglé",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042040"
+        },
+        "MISIÓN TACAAGLÉ": {
+          "lat": -24.980999991,
+          "lng": -58.819934389,
+          "name": "Misión Tacaaglé",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042040"
+        },
+        "PALO SANTO": {
+          "lat": -25.564593878,
+          "lng": -59.337719095,
+          "name": "Palo Santo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056030"
+        },
+        "PIRANE ": {
+          "lat": -25.732649819,
+          "lng": -59.109808063,
+          "name": "Pirané",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056040"
+        },
+        "PIRANÉ": {
+          "lat": -25.732649819,
+          "lng": -59.109808063,
+          "name": "Pirané",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056040"
+        },
+        "POSTA CAMBIO ZALAZAR": {
+          "lat": -24.210788936,
+          "lng": -60.197262428,
+          "name": "Posta Cambio Zalazar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035110"
+        },
+        "POZO DEL TIGRE": {
+          "lat": -24.895553545,
+          "lng": -60.319184515,
+          "name": "Pozo del Tigre",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035120"
+        },
+        "RIACHO HE HE": {
+          "lat": -25.360656781,
+          "lng": -58.279795911,
+          "name": "Riacho He-He",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049060"
+        },
+        "SAN MARTÍN 2": {
+          "lat": -24.433734103,
+          "lng": -59.654904791,
+          "name": "San Martín II",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035140"
+        },
+        "SIETE PALMAS": {
+          "lat": -25.203691143,
+          "lng": -58.332003225,
+          "name": "Siete Palmas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049080"
+        },
+        "TATANE": {
+          "lat": -26.398152825,
+          "lng": -58.357336954,
+          "name": "Tatané",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021050"
+        },
+        "TRES LAGUNAS": {
+          "lat": -25.216124037,
+          "lng": -58.513078609,
+          "name": "Tres Lagunas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042060"
+        },
+        "V. ESCOLAR": {
+          "lat": -26.621916792,
+          "lng": -58.669706677,
+          "name": "Villa Escolar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021060"
+        },
+        "VILLA 213": {
+          "lat": -26.187165695,
+          "lng": -59.367155479,
+          "name": "Villa Kilómetro 213",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056050"
+        },
+        "VILLA DOSTRECE": {
+          "lat": -26.187165695,
+          "lng": -59.367155479,
+          "name": "Villa Kilómetro 213",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056050"
+        },
+        "VILLA ESCOLAR": {
+          "lat": -26.621916792,
+          "lng": -58.669706677,
+          "name": "Villa Escolar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021060"
+        },
+        "VILLA GENERAL GÜEMES": {
+          "lat": -24.755783305,
+          "lng": -59.48851006,
+          "name": "Villa General Güemes",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035160"
+        },
+        "VILLA GRAL GÜEMES": {
+          "lat": -24.755783305,
+          "lng": -59.48851006,
+          "name": "Villa General Güemes",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035160"
+        },
+        "VILLAFAÑE": {
+          "lat": -26.204686883,
+          "lng": -59.080025184,
+          "name": "Colonia Campo Villafañe",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056010"
+        },
+        "VILLAFAÑE ": {
+          "lat": -26.204686883,
+          "lng": -59.080025184,
+          "name": "Colonia Campo Villafañe",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056010"
+        }
+      },
+      "pending": [],
+      "non_point_groups": {}
+    },
+    "det-mapa": {
+      "column": "AREA PROGRAMATICA",
+      "locations": {
+        "8 de Octubre": {
+          "lat": -26.12816200123235,
+          "lng": -58.159475326538086,
+          "name": "CENTRO DE SALUD 8 DE OCTUBRE",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147138",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Antenor Gauna": {
+          "lat": -26.128321,
+          "lng": -58.153914999999984,
+          "name": "CENTRO DE SALUD  ANTENOR GAUNA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147091",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "B° 2 de Abril": {
+          "lat": -26.17234740777639,
+          "lng": -58.19485902786255,
+          "name": "HOSPITAL DE DIA DEL BARRIO 2 DE ABRIL DR. ADOLFO LIPPMAN",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147135",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Bº 1º de Mayo": {
+          "lat": -25.2895772,
+          "lng": -57.752474,
+          "name": "Centro de Salud Dr. Ramón Carrillo (Bº 1º de Mayo)",
+          "reference": "https://www.openstreetmap.org/node/4408062289",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Bº B. Rivadavia": {
+          "lat": -26.200344661543284,
+          "lng": -58.155269622802734,
+          "name": "CENTRO DE SALUD DR. HECTOR PASTOR - BARRIO BERNARDINO RIVADAVIA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147093",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Bº Obrero(I. Juárez)": {
+          "lat": -23.8945923,
+          "lng": -61.8553505,
+          "name": "CENTRO DE SALUD BARRIO OBRERO (INGENIERO JUAREZ)",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340282147101",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Clorinda": {
+          "lat": -25.286080881,
+          "lng": -57.7224082,
+          "name": "Clorinda",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049010",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Col. B. de Las Casas": {
+          "lat": -25.348680259,
+          "lng": -59.6122308,
+          "name": "Comunidad Aborigen Bartolomé de las Casas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/localidades?id=3403501002",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "E. Del Campo": {
+          "lat": -25.053546274,
+          "lng": -60.090638521,
+          "name": "Estanislao del Campo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035050",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "EL Pucú": {
+          "lat": -26.200171384244133,
+          "lng": -58.219449520111084,
+          "name": "CENTRO DE SALUD  EL PUCU",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147096",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "El Chorro": {
+          "lat": -23.183829531,
+          "lng": -62.306572015,
+          "name": "General Mosconi",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063020",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "El Colorado": {
+          "lat": -26.309061021,
+          "lng": -59.372308046,
+          "name": "El Colorado",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056020",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "El Espinillo": {
+          "lat": -24.981482853,
+          "lng": -58.552561591,
+          "name": "El Espinillo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042020",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "El Porteño": {
+          "lat": -25.262748126766702,
+          "lng": -57.72998371950373,
+          "name": "Centro de Salud El Porteño",
+          "reference": "https://fd.formosa.gob.ar/puntosconectados#marker_12907",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "El Potrillo": {
+          "lat": -23.16244021,
+          "lng": -62.008962864,
+          "name": "El Potrillo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063010",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "El Quebracho": {
+          "lat": -23.342517804,
+          "lng": -61.871584013,
+          "name": "El Quebracho",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063030",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Eva Perón": {
+          "lat": -26.141277791642313,
+          "lng": -58.15767220800344,
+          "name": "Hospital Distrital Nº 8 Eva Perón",
+          "reference": "https://fd.formosa.gob.ar/puntosconectados#marker_12063",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Fontana": {
+          "lat": -25.330640381,
+          "lng": -59.680989769,
+          "name": "Comandante Fontana",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035030",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Fortín Lugones": {
+          "lat": -24.286422629,
+          "lng": -59.8276786,
+          "name": "Fortín Cabo 1º Lugones",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035060",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Gral Belgrano": {
+          "lat": -24.938533856,
+          "lng": -59.026389294,
+          "name": "Villa General Manuel Belgrano",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035170",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Gral Güemes": {
+          "lat": -24.755783305,
+          "lng": -59.48851006,
+          "name": "Villa General Güemes",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035160",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Gran Guardia": {
+          "lat": -25.862762272,
+          "lng": -58.885728596,
+          "name": "Gran Guardia",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014030",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Guadalcazar": {
+          "lat": -23.672947932,
+          "lng": -61.163607603,
+          "name": "Guadalcazar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007005",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Guadalupe": {
+          "lat": -26.184825694394874,
+          "lng": -58.19405436515808,
+          "name": "CENTRO DE SALUD GUADALUPE",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147680",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Herradura": {
+          "lat": -26.48984781,
+          "lng": -58.311618191,
+          "name": "Herradura",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021030",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Ibarreta": {
+          "lat": -25.214499757,
+          "lng": -59.858892437,
+          "name": "Ibarreta",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035080",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Independencia": {
+          "lat": -26.1816132,
+          "lng": -58.184896500000036,
+          "name": "CENTRO DE SALUD INDEPENDENCIA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147097",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Ingeniero Juárez": {
+          "lat": -23.90373915,
+          "lng": -61.842429269,
+          "name": "Ingeniero Guillermo N. Juárez",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34028010",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Juan D. Perón": {
+          "lat": -26.132962,
+          "lng": -58.17897099999999,
+          "name": "CENTRO DE SALUD MARIA LUISA ESPINOZA B° JUAN DOMINGO PERON",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147124",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "La Floresta": {
+          "lat": -26.157444,
+          "lng": -58.182040099999995,
+          "name": "CENTRO DE SALUD  LA FLORESTA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147098",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "La Primavera": {
+          "lat": -25.203471336,
+          "lng": -58.25367331,
+          "name": "La Primavera",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049A16",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "La Rinconada": {
+          "lat": -23.494796161,
+          "lng": -61.576653565,
+          "name": "La Rinconada",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007007",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Lag. Naick Neck": {
+          "lat": -25.22273689,
+          "lng": -58.12101582,
+          "name": "Laguna Naick-Neck",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049030",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Laguna Blanca": {
+          "lat": -25.126264296,
+          "lng": -58.240457282,
+          "name": "Laguna Blanca",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049020",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Laguna Yema": {
+          "lat": -24.255524629,
+          "lng": -61.241985111,
+          "name": "Laguna Yema",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007010",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Lamadrid": {
+          "lat": -23.896946974,
+          "lng": -60.754546867,
+          "name": "Lamadrid",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007015",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Las Lomitas": {
+          "lat": -24.708135606,
+          "lng": -60.591376883,
+          "name": "Las Lomitas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035100",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Liborsi": {
+          "lat": -26.19291275909642,
+          "lng": -58.221702575683594,
+          "name": "CENTRO DE SALUD LUIS MARIA CODDA BARRIO LIBORSI",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147123",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Los Chiriguanos": {
+          "lat": -24.098814349,
+          "lng": -61.461974295,
+          "name": "Los Chiriguanos",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007020",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Lote 8": {
+          "lat": -22.841317693,
+          "lng": -62.276959501,
+          "name": "Lote 8",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34063A27",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Lucio V. Mansilla": {
+          "lat": -26.657689509,
+          "lng": -58.630460262,
+          "name": "General Lucio V. Mansilla",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021020",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Madrassi": {
+          "lat": -25.3104456,
+          "lng": -57.72176509999997,
+          "name": "CENTRO DE SALUD BARRIO TOBA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340492147103",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Maria Cristina": {
+          "lat": -22.738196249,
+          "lng": -62.275395414,
+          "name": "MARIA CRISTINA",
+          "reference": "https://snop-ppo.obraspublicas.gob.ar/localities/details/903c278f-afb2-4e66-ade0-36ea194fedd6",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Mariano Moreno": {
+          "lat": -26.1974061,
+          "lng": -58.19632949999999,
+          "name": "CENTRO DE SALUD MARIANO MORENO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147125",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Misión Laishí": {
+          "lat": -26.243867035,
+          "lng": -58.629613052,
+          "name": "San Francisco de Laishi",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021040",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Misión Tacaaglé": {
+          "lat": -24.980999991,
+          "lng": -58.819934389,
+          "name": "Misión Tacaaglé",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042040",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Mojón de Fierro": {
+          "lat": -26.033189506,
+          "lng": -58.049051,
+          "name": "Mojón de Fierro",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014050",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Nam- Qom": {
+          "lat": -26.126851978036793,
+          "lng": -58.230886459350586,
+          "name": "CENTRO DE SALUD NAMQOM",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147126",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Nan- Qom": {
+          "lat": -26.126851978036793,
+          "lng": -58.230886459350586,
+          "name": "CENTRO DE SALUD NAMQOM",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147126",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Nueva Formosa": {
+          "lat": -26.2227073125136,
+          "lng": -58.289474947753,
+          "name": "CENTRO DE SALUD LA NUEVA FORMOSA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147951",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Palo Santo": {
+          "lat": -25.564593878,
+          "lng": -59.337719095,
+          "name": "Palo Santo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056030",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Pastoril": {
+          "lat": -25.672693191,
+          "lng": -58.261494859,
+          "name": "Colonia Pastoril",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34014010",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Pirané": {
+          "lat": -25.732649819,
+          "lng": -59.109808063,
+          "name": "Pirané",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056040",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Posta C. Zalazar": {
+          "lat": -24.210788936,
+          "lng": -60.197262428,
+          "name": "Posta Cambio Zalazar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035110",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Pozo de Maza": {
+          "lat": -23.570321915,
+          "lng": -61.708060029,
+          "name": "Pozo de Maza",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34007030",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Pozo del Tigre": {
+          "lat": -24.895553545,
+          "lng": -60.319184515,
+          "name": "Pozo del Tigre",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035120",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Puerto Pilcomayo": {
+          "lat": -25.372224407,
+          "lng": -57.651606485,
+          "name": "Puerto Pilcomayo",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049050",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Rca. Argentina": {
+          "lat": -26.14203193363435,
+          "lng": -58.160762786865234,
+          "name": "CENTRO DE SALUD REPUBLICA ARGENTINA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147129",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Riacho He-He": {
+          "lat": -25.360656781,
+          "lng": -58.279795911,
+          "name": "Riacho He-He",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049060",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "San Agustín": {
+          "lat": -26.1628073,
+          "lng": -58.16500229999997,
+          "name": "CENTRO DE SALUD SAN AGUSTIN",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147131",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "San Antonio": {
+          "lat": -26.1667648,
+          "lng": -58.207646599999975,
+          "name": "CENTRO DE SALUD BARRIO SAN ANTONIO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147102",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "San Francisco": {
+          "lat": -26.175890760777452,
+          "lng": -58.183722496032715,
+          "name": "CENTRO DE SALUD SAN FRANCISCO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147132",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "San José Obrero": {
+          "lat": -26.19325933503777,
+          "lng": -58.163723945617676,
+          "name": "CENTRO DE SALUD SAN JOSE OBRERO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147133",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "San Juan Bautista": {
+          "lat": -26.206871252020566,
+          "lng": -58.20925712585449,
+          "name": "CENTRO DE SALUD DR. MARIO JORGE KRIMER",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147110",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "San Martín Nº2": {
+          "lat": -24.433734103,
+          "lng": -59.654904791,
+          "name": "San Martín II",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035140",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Siete Palmas": {
+          "lat": -25.203691143,
+          "lng": -58.332003225,
+          "name": "Siete Palmas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34049080",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Siete de Mayo": {
+          "lat": -26.132811,
+          "lng": -58.16512899999998,
+          "name": "CENTRO DE SALUD 7 DE MAYO",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147137",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Subtte. Perín": {
+          "lat": -25.535408824,
+          "lng": -60.018824327,
+          "name": "Subteniente Perín",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34035150",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Tres Lagunas": {
+          "lat": -25.216124037,
+          "lng": -58.513078609,
+          "name": "Tres Lagunas",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34042060",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Villa 213": {
+          "lat": -26.187165695,
+          "lng": -59.367155479,
+          "name": "Villa Kilómetro 213",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056050",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Villa Escolar": {
+          "lat": -26.621916792,
+          "lng": -58.669706677,
+          "name": "Villa Escolar",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34021060",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Villa Hermosa": {
+          "lat": -26.196085,
+          "lng": -58.178740000000005,
+          "name": "CENTRO DE SALUD VILLA HERMOSA",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147134",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Villa La Pilar": {
+          "lat": -26.191897,
+          "lng": -58.184098000000006,
+          "name": "CENTRO DE SALUD DR. JORGE LUIS DIEZ BARRIO VILLA LA PILAR",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147121",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Villa Lourdes": {
+          "lat": -26.1608209,
+          "lng": -58.18658949999997,
+          "name": "CENTRO DE SALUD DR. PABLO ESTEBAN BARGAS - B° VILLA LOURDES",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147111",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Villa del Carmen": {
+          "lat": -26.276831003744817,
+          "lng": -58.242387771606445,
+          "name": "CENTRO DE SALUD  VILLA DEL CARMEN",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147100",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        },
+        "Villafañe": {
+          "lat": -26.204686883,
+          "lng": -59.080025184,
+          "name": "Colonia Campo Villafañe",
+          "reference": "https://apis.datos.gob.ar/georef/api/v2.0/asentamientos?id=34056010",
+          "note": "Localidad usada como referencia del área programática; el punto no representa sus límites."
+        },
+        "Virgen de Itatí": {
+          "lat": -26.174703,
+          "lng": -58.203935,
+          "name": "CENTRO DE SALUD  BARRIO ITATI",
+          "reference": "https://sisa.msal.gov.ar/datos/descargas/georef/files/refes_georef.zip#50340142147092",
+          "note": "Centro de salud usado como referencia del área programática; el punto no representa sus límites."
+        }
+      },
+      "pending": [],
+      "non_point_groups": {
+        "Clorinda Área Rural": "Agrupación sin una ubicación puntual única; conserva sus medidas en el detalle.",
+        "Distrito 11": "Agrupación sin una ubicación puntual única; conserva sus medidas en el detalle.",
+        "OTROS": "Agrupación sin una ubicación puntual única; conserva sus medidas en el detalle.",
+        "Otros": "Agrupación sin una ubicación puntual única; conserva sus medidas en el detalle."
+      }
+    }
+  }
+}

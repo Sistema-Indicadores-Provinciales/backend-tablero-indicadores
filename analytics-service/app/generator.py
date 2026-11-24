@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from time import monotonic
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID, uuid4
 from urllib.parse import urlparse, quote
 
@@ -15,12 +15,12 @@ import httpx
 import jwt
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
-from pydantic import BaseModel, Field, ConfigDict, SecretStr, ValidationError, field_validator
+from pydantic import BaseModel, Field, ConfigDict, SecretStr, ValidationError, field_validator, model_validator
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 from starlette.concurrency import run_in_threadpool
 
-from app.data_engine import (DataError, read_rows, bounded, table, chart, filter_frame,
+from app.data_engine import (DataError, read_rows, bounded, table, chart, filter_frame, restrict_frame,
                              filter_selection, apply_view_filters, contextual_filter_options, MAX_ROWS, MAX_COLS)
 from app import google_oauth
 from app.cors_origins import cors_origins
@@ -151,7 +151,7 @@ def spreadsheet_id(value):
         raise DataError("Pegá un enlace de Google Sheets con formato https://docs.google.com/spreadsheets/d/...")
     return match.group(1)
 
-def google_get(source, token, range_name=None):
+def google_get(source, token, range_name=None, *, row_range=None):
     key = os.getenv("GOOGLE_SHEETS_API_KEY", "")
     if not token and not key:
         raise HTTPException(409, "Para leer esta hoja, conectá tu cuenta desde el panel Google Sheets. Si la conexión no está habilitada, consultá la configuración con un administrador.")
@@ -161,7 +161,14 @@ def google_get(source, token, range_name=None):
     if range_name is None:
         params["fields"] = "properties(title),sheets(properties(title,gridProperties(rowCount,columnCount)))"
     else:
-        url += "/values/" + quote("'" + range_name.replace("'", "''") + "'", safe="")
+        a1 = "'" + range_name.replace("'", "''") + "'"
+        if row_range is not None:
+            start, end, width = row_range
+            if not (1 <= start <= end <= 1_000_000 and 1 <= width <= MAX_COLS):
+                raise DataError('Rango de lectura no válido.')
+            from openpyxl.utils import get_column_letter
+            a1 += f'!A{start}:{get_column_letter(width)}{end}'
+        url += "/values/" + quote(a1, safe="")
         params.update({"valueRenderOption": "FORMATTED_VALUE", "majorDimension": "ROWS"})
     headers = {"Authorization": "Bearer " + token} if token else {}
     try:
@@ -271,12 +278,58 @@ def sheets(source_id: str, owner=Depends(user), x_google_access_token: str = Hea
         return [s["properties"]["title"] for s in info.get("sheets", [])]
     return read_rows(local_path(doc))
 
+class TextPart(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    column: str = Field(default='', max_length=500)
+    literal: str = Field(default='', max_length=500)
+    start: int = Field(default=1, ge=1, le=10000)
+    length: int | None = Field(default=None, ge=0, le=10000)
+    case: str = Field(default='none', pattern=r'^(none|upper|lower)$')
+
+
+class AggregateJoin(BaseModel):
+    """One bounded, pre-aggregated join within the already authorized workbook."""
+    model_config = ConfigDict(extra='forbid')
+    sheet: str = Field(min_length=1, max_length=200)
+    header_row: int = Field(default=1, ge=0, le=100000)
+    decimal: str = Field(default=',', pattern=r'^[,.]$')
+    types: dict[str, str] = Field(default_factory=dict)
+    keys: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(min_length=1, max_length=10)
+    right_dimensions: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=10)
+    left_sums: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(min_length=1, max_length=20)
+    right_sums: dict[Annotated[str, Field(min_length=1, max_length=500)], Annotated[str, Field(min_length=1, max_length=500)]] = Field(min_length=1, max_length=20)
+
+
+class GoogleSummary(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    dimensions: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(min_length=1, max_length=20)
+    counts: dict[Annotated[str, Field(min_length=1, max_length=500)], Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=dict, max_length=20)
+    max_values: dict[Annotated[str, Field(min_length=1, max_length=500)], Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=dict, max_length=10)
+    row_count: str = Field(default='Registros', min_length=1, max_length=500)
+
+
 class ReadConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     sheet: str = Field(min_length=1, max_length=200)
     header_row: int = Field(default=1, ge=0, le=100000)
     decimal: str = Field(default=",", pattern=r"^[,.]$")
     types: dict[str, str] = Field(default_factory=dict)
+    computed_columns: dict[Annotated[str, Field(min_length=1, max_length=500)], list[TextPart]] = Field(default_factory=dict, max_length=30)
+    aggregate_join: AggregateJoin | None = None
+    google_summary: GoogleSummary | None = None
+
+    @model_validator(mode='after')
+    def exclusive_reads(self):
+        if self.aggregate_join and self.google_summary:
+            raise ValueError('La combinación de pestañas y el resumen por bloques son lecturas diferentes.')
+        return self
+
+    @field_validator('computed_columns')
+    @classmethod
+    def bounded_expressions(cls, definitions):
+        if any(not parts or len(parts) > 10 for parts in definitions.values()):
+            raise ValueError('Cada fórmula necesita entre 1 y 10 partes de texto.')
+        return definitions
 
 
 class SortConfig(BaseModel):
@@ -284,6 +337,62 @@ class SortConfig(BaseModel):
     field: str = Field(min_length=1, max_length=500)
     aggregation: str = Field(default="alphabetical", pattern=r"^(alphabetical|sum|max|min|count|distinct)$")
     direction: str = Field(default="asc", pattern=r"^(asc|desc)$")
+    tie_order: list[Annotated[str, Field(max_length=2000)]] = Field(default_factory=list, max_length=500)
+    tie_breaker: Literal['alphabetical', 'source_heap'] = 'alphabetical'
+
+
+class FilterRule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    column: str = Field(min_length=1, max_length=500)
+    operator: str = Field(pattern=r"^(equal|not_equal|contains|not_contains|empty|not_empty|in|greater_equal)$")
+    value: str = Field(default="", max_length=2000)
+    values: list[Annotated[str, Field(max_length=2000)]] = Field(default_factory=list, max_length=100)
+
+
+class IndicatorCondition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    column: str = Field(min_length=1, max_length=500)
+    minimum: float = Field(allow_inf_nan=False)
+
+
+class MetricCondition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    column: str = Field(min_length=1, max_length=500)
+    excluded_value: str = Field(min_length=1, max_length=2000)
+
+
+class IndicatorLookup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    column: str = Field(min_length=1, max_length=500)
+    values: dict[Annotated[str, Field(max_length=2000)], Annotated[float, Field(allow_inf_nan=False)]] = Field(max_length=100)
+
+
+class IndicatorRatio(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    denominator: str = Field(min_length=1, max_length=500)
+    scale: float = Field(default=100, allow_inf_nan=False)
+
+
+class MetricRatio(IndicatorRatio):
+    subtract_denominator: bool = False
+    series_order: Literal['asc', 'desc'] | None = None
+
+
+class MapLocation(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    lat: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    lng: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    name: str = Field(max_length=500)
+    reference: str = Field(max_length=1000)
+    note: str = Field(default='', max_length=1000)
+
+
+class MapLookup(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    column: str = Field(min_length=1, max_length=500)
+    locations: dict[Annotated[str, Field(min_length=1, max_length=500)], MapLocation] = Field(max_length=2000)
+    category_col: str = Field(default='', max_length=500)
+    sized: bool = True
 
 
 class ChartConfig(ReadConfig):
@@ -296,6 +405,31 @@ class ChartConfig(ReadConfig):
     group_col: str = ""
     date_bucket: str = "none"
     filters: dict[str, list[str]] = Field(default_factory=dict)
+    filter_rules: list[FilterRule] = Field(default_factory=list, max_length=50)
+    count_col: str = Field(default="", max_length=500)
+    indicator_condition: IndicatorCondition | None = None
+    indicator_rules: list[FilterRule] = Field(default_factory=list, max_length=50)
+    indicator_sum_rules: list[FilterRule] = Field(default_factory=list, max_length=50)
+    indicator_addends: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=19)
+    indicator_text_column: str = Field(default='', max_length=500)
+    indicator_single_value_columns: list[str] = Field(default_factory=list, max_length=20)
+    value_format: Literal['number', 'percent', 'percent_points'] = 'number'
+    indicator_divisor: float = Field(default=1, gt=0, allow_inf_nan=False)
+    indicator_rounding: str = Field(default='none', pattern=r'^(none|floor|ceil)$')
+    indicator_lookup: IndicatorLookup | None = None
+    indicator_ratio: IndicatorRatio | None = None
+    indicator_decimals: int | None = Field(default=None, ge=0, le=6)
+    indicator_suffix: str = Field(default='', max_length=20)
+    indicator_empty: Literal['missing', 'zero'] = 'missing'
+    metric_condition: MetricCondition | None = None
+    metric_ratio: MetricRatio | None = None
+    table_mode: str = Field(default='rows', pattern=r'^(rows|summary)$')
+    table_dimensions: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=20)
+    table_sorts: list[SortConfig] = Field(default_factory=list, max_length=5)
+    preserve_empty_categories: bool = False
+    category_limit: int | None = Field(default=None, ge=2, le=500)
+    include_other: bool = False
+    series_limit: int | None = Field(default=None, ge=1, le=50)
     category_sort: SortConfig | None = None
     series_sort: SortConfig | None = None
     latitude_col: str = Field(default="", max_length=500)
@@ -304,6 +438,7 @@ class ChartConfig(ReadConfig):
     size_col: str = Field(default="", max_length=500)
     map_mode: str = Field(default="markers", pattern=r"^(markers|circles)$")
     map_metric_cols: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=20)
+    map_lookup: MapLookup | None = None
 
 def load_table(source_id, owner, config, google_token):
     doc = source_for(source_id, owner)
@@ -312,6 +447,24 @@ def load_table(source_id, owner, config, google_token):
     return table_from_source(doc, config, google_token)
 
 def table_from_source(doc, config, google_token):
+    if config.google_summary:
+        if doc.get('kind') != 'google' or doc.get('access_mode') == 'public':
+            raise DataError('Para leer por bloques, conectá una cuenta con acceso al archivo de Google Sheets.')
+        from .google_summary import summarize_google
+        from .calculated_columns import calculated_columns
+        frame, metadata = summarize_google(doc, config, google_token, google_get)
+        return calculated_columns(frame, metadata, config.model_dump()['computed_columns'])
+    if config.aggregate_join:
+        if doc.get('access_mode') == 'public':
+            raise DataError('Para combinar pestañas, conectá una cuenta con acceso al archivo completo.')
+        from .aggregate_join import aggregate_join
+        left_config = ReadConfig.model_validate(config.model_dump(include={'sheet', 'header_row', 'decimal', 'types'}))
+        left, left_meta = table_from_source(doc, left_config, google_token)
+        right_config = ReadConfig.model_validate(config.aggregate_join.model_dump(include={'sheet', 'header_row', 'decimal', 'types'}))
+        right, right_meta = table_from_source(doc, right_config, google_token)
+        frame, metadata = aggregate_join(left, left_meta, right, right_meta, config.aggregate_join.model_dump())
+        from .calculated_columns import calculated_columns
+        return calculated_columns(frame, metadata, config.model_dump()['computed_columns'])
     if doc["kind"] == "google":
         if doc.get("access_mode") == "public":
             if config.sheet != SHEET_NAME:
@@ -322,6 +475,8 @@ def table_from_source(doc, config, google_token):
     else:
         raw = read_rows(local_path(doc), config.sheet)
     frame, metadata = table(raw, config.header_row, config.decimal, config.types)
+    from .calculated_columns import calculated_columns
+    frame, metadata = calculated_columns(frame, metadata, config.model_dump()['computed_columns'])
     metadata["raw_preview"] = raw[:20]
     if doc.get("access_mode") == "public":
         metadata["warnings"].append("Se consulta la pestaña del enlace. Google puede demorar unos minutos en reflejar cambios publicados.")
@@ -332,7 +487,7 @@ def table_from_source(doc, config, google_token):
 
 def read_config_key(config: ReadConfig) -> str:
     """Identify a parsed table without considering chart-only settings."""
-    read = config.model_dump(include={"sheet", "header_row", "decimal", "types"})
+    read = config.model_dump(include={"sheet", "header_row", "decimal", "types", "computed_columns", "aggregate_join", "google_summary"})
     return json.dumps(read, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
@@ -340,9 +495,10 @@ def workspace_fingerprint(workspace: dict) -> str:
     """Reject snapshots after a saved workspace changes configuration."""
     payload = {
         "source_id": workspace.get("source_id"),
-        "widgets": [{"id": item.get("id"), "config": item.get("config")} for item in workspace.get("widgets", [])],
+        "widgets": [{"id": item.get("id"), "source_id": item.get("source_id"), "config": item.get("config")} for item in workspace.get("widgets", [])],
         "filter_columns": workspace.get("filter_columns"),
         "filter_sorts": workspace.get("filter_sorts"),
+        "filter_option_rules": workspace.get("filter_option_rules"),
         "column_aliases": workspace.get("column_aliases"),
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
@@ -350,11 +506,16 @@ def workspace_fingerprint(workspace: dict) -> str:
 
 
 def workspace_view_payload(workspace: dict, source: dict, owner: str) -> dict:
+    sources = [source, *[source_for(identifier, workspace["owner"]) for identifier in {
+        widget.get("source_id") for widget in workspace.get("widgets", [])
+        if widget.get("source_id") and widget["source_id"] != workspace["source_id"]
+    }]]
     return {
         **public(workspace),
         "can_edit": workspace["owner"] == owner,
         "source_kind": source["kind"],
         "source_access_mode": source.get("access_mode"),
+        "requires_google": any(item["kind"] == "google" and item.get("access_mode") != "public" for item in sources),
     }
 
 
@@ -369,17 +530,27 @@ def validate_view_filters(filters: dict) -> None:
         raise HTTPException(422, str(exc)) from exc
 
 
+def widget_read_key(widget: dict) -> str:
+    read_key = read_config_key(ChartConfig.model_validate(widget["config"]))
+    return json.dumps([widget["source_id"], read_key]) if widget.get("source_id") else read_key
+
+
 def load_section_snapshot(workspace: dict, source: dict, viewer: str, google_token: str) -> SectionSnapshot:
     """Read each distinct sheet configuration once and retain no credential."""
-    if source["kind"] == "google" and source.get("access_mode") != "public":
-        google_token = google_token or google_oauth.access_token(db(), viewer)
+    sources = {workspace["source_id"]: source}
     tables: dict[str, tuple[object, dict]] = {}
     for widget in workspace.get("widgets", []):
         config = ChartConfig.model_validate(widget["config"])
-        key = read_config_key(config)
+        key = widget_read_key(widget)
         if key in tables:
             continue
-        frame, metadata = table_from_source(source, config, google_token)
+        identifier = widget.get("source_id") or workspace["source_id"]
+        if identifier not in sources:
+            sources[identifier] = source_for(identifier, workspace["owner"])
+        widget_source = sources[identifier]
+        if widget_source["kind"] == "google" and widget_source.get("access_mode") != "public":
+            google_token = google_token or google_oauth.access_token(db(), viewer)
+        frame, metadata = table_from_source(widget_source, config, google_token)
         metadata.pop("raw_preview", None)
         tables[key] = (frame, metadata)
     return SectionSnapshot(uuid4().hex, workspace["_id"], viewer, workspace_fingerprint(workspace), tables, monotonic())
@@ -392,29 +563,41 @@ def section_allowed_columns(workspace: dict, snapshot: SectionSnapshot) -> set[s
     allowed: set[str] = set()
     for saved in workspace.get("widgets", []):
         config = ChartConfig.model_validate(saved["config"])
-        frame, _ = snapshot.tables[read_config_key(config)]
+        frame, _ = snapshot.tables[widget_read_key(saved)]
         if config.chart_type == "table":
             allowed.update(frame.columns)
         allowed.update([
             config.x_col, config.y_col, *config.y_cols, config.group_col,
             config.latitude_col, config.longitude_col, config.label_col, config.size_col,
             *config.map_metric_cols, *config.filters,
+            *([config.map_lookup.column, config.map_lookup.category_col] if config.map_lookup else []),
         ])
     allowed.discard("")
     return allowed
 
 
-def render_snapshot_widget(widget: dict, snapshot: SectionSnapshot, filters: dict, allowed: set[str], filter_sorts: dict) -> dict:
+def render_snapshot_widget(widget: dict, snapshot: SectionSnapshot, filters: dict, allowed: set[str], filter_sorts: dict, filter_option_rules: list | None = None, options_cache: dict | None = None) -> dict:
     """Calculate one widget from an already loaded table."""
     config = ChartConfig.model_validate(widget["config"])
-    frame, metadata = snapshot.tables[read_config_key(config)]
-    frame = filter_frame(frame, config.filters)
+    frame, metadata = snapshot.tables[widget_read_key(widget)]
+    frame = restrict_frame(frame, config.model_dump())
     applicable = {column: selection for column, selection in filters.items() if column in frame.columns}
-    options = contextual_filter_options(frame, allowed, applicable, filter_sorts)
-    for column, option in options.items():
-        option["type"] = metadata["column_meta"][column]["type"]
+    # Control restrictions limit available choices, not a chart's measurements.
+    # This cache lives only for this render/viewer/filter selection. Only charts
+    # with identical sources, parsing and saved restrictions share their facets.
+    option_key = (widget_read_key(widget), json.dumps(config.model_dump(include={'filters', 'filter_rules'}), sort_keys=True))
+    options = options_cache.get(option_key) if options_cache is not None else None
+    if options is None:
+        option_frame = restrict_frame(frame, {"filter_rules": filter_option_rules or []})
+        options = contextual_filter_options(option_frame, allowed, applicable, filter_sorts, 5000 if config.google_summary else 100)
+        for column, option in options.items():
+            option["type"] = metadata["column_meta"][column]["type"]
+        if options_cache is not None:
+            options_cache[option_key] = options
     filtered_frame = apply_view_filters(frame, applicable)
-    result = chart(filtered_frame, {**config.model_dump(), "filters": {}})
+    result = chart(filtered_frame, {**config.model_dump(), "filters": {}, "filter_rules": []})
+    if metadata.get('row_count_column'):
+        result['filtered_rows'] = int(filtered_frame[metadata['row_count_column']].sum())
     result["filter_options"] = options
     result["ignored_filters"] = [column for column, selection in filters.items()
                                  if filter_selection(selection)[1] and column not in frame.columns]
@@ -442,7 +625,8 @@ def merge_section_filter_options(rendered: dict[str, dict], filters: dict) -> di
             _, selected = filter_selection(filters.get(column, []))
             available = option.get("available_selected") or [value for value in selected if value in option.get("values", [])]
             merged[column] = {
-                "values": values[:100],
+                "values": values[:max(previous.get('value_limit', 100), option.get('value_limit', 100))],
+                "value_limit": max(previous.get('value_limit', 100), option.get('value_limit', 100)),
                 "total": max(len(values), previous.get("total", 0), option.get("total", 0)),
                 "unfiltered_total": max(previous.get("unfiltered_total", 0), option.get("unfiltered_total", 0)),
                 "type": option.get("type"),
@@ -458,9 +642,11 @@ def render_section_snapshot(workspace: dict, snapshot: SectionSnapshot, filters:
     if any(column not in allowed for column in filters):
         raise HTTPException(422, "Solo podés filtrar por los campos habilitados en esta sección.")
     rendered: dict[str, dict] = {}
+    options_cache = {}
     for widget in workspace.get("widgets", []):
         try:
-            rendered[widget["id"]] = {"data": render_snapshot_widget(widget, snapshot, filters, allowed, workspace.get("filter_sorts", {}))}
+            rendered[widget["id"]] = {"data": render_snapshot_widget(widget, snapshot, filters, allowed,
+                workspace.get("filter_sorts", {}), workspace.get("filter_option_rules", []), options_cache)}
         except (DataError, ValidationError, ValueError) as exc:
             rendered[widget["id"]] = {"error": str(exc) or "No se pudo generar este gráfico."}
     return rendered, merge_section_filter_options(rendered, filters)
@@ -473,6 +659,8 @@ def preview(source_id: str, config: ReadConfig, owner=Depends(user), x_google_ac
 def generate(source_id: str, config: ChartConfig, owner=Depends(user), x_google_access_token: str = Header(default="")):
     frame, metadata = load_table(source_id, owner, config, x_google_access_token)
     result = chart(frame, config.model_dump())
+    if metadata.get('row_count_column'):
+        result['filtered_rows'] = int(restrict_frame(frame, config.model_dump())[metadata['row_count_column']].sum())
     result["warnings"] = metadata["warnings"] + result.get("warnings", [])
     return result
 
@@ -482,6 +670,7 @@ class Widget(BaseModel):
     title: str = Field(default="Gráfico", max_length=200)
     width: int = Field(default=12, ge=6, le=12)
     library: str = Field(default="Plotly", pattern=r"^(Plotly|ECharts)$")
+    source_id: str | None = Field(default=None, min_length=1, max_length=500)
     config: ChartConfig
 
 class Destination(BaseModel):
@@ -498,7 +687,16 @@ class Workspace(BaseModel):
     filter_columns: list[Annotated[str, Field(min_length=1, max_length=500)]] | None = Field(default=None, max_length=20)
     column_aliases: dict[str, str] = Field(default_factory=dict, max_length=MAX_COLS)
     filter_sorts: dict[str, SortConfig] = Field(default_factory=dict, max_length=20)
+    filter_option_rules: list[FilterRule] = Field(default_factory=list, max_length=50)
     destination: Destination | None = None
+    default_filters: dict[Annotated[str, Field(min_length=1, max_length=500)], list[Annotated[str, Field(max_length=2000)]]] = Field(default_factory=dict, max_length=20)
+
+    @field_validator('default_filters')
+    @classmethod
+    def validate_defaults(cls, values):
+        if any(len(selected) > 100 for selected in values.values()):
+            raise ValueError('Cada filtro inicial admite hasta 100 valores.')
+        return values
 
     @field_validator("column_aliases")
     @classmethod
@@ -529,6 +727,8 @@ def workspaces(owner=Depends(user)):
 @router.post("/workspaces")
 def save_workspace(config: Workspace, owner=Depends(user)):
     source_for(config.source_id, owner)
+    for identifier in {widget.source_id for widget in config.widgets if widget.source_id}:
+        source_for(identifier, owner)
     if config.destination:
         validate_destination(db(), config.destination.model_dump(), current_user(db(), owner))
     doc = {"_id": uuid4().hex, "owner": owner, **config.model_dump(exclude_none=True)}
@@ -538,6 +738,8 @@ def save_workspace(config: Workspace, owner=Depends(user)):
 @router.put("/workspaces/{workspace_id}")
 def update_workspace(workspace_id: str, config: Workspace, owner=Depends(user)):
     source_for(config.source_id, owner)
+    for identifier in {widget.source_id for widget in config.widgets if widget.source_id}:
+        source_for(identifier, owner)
     existing = owned_workspace(db(), workspace_id, owner)
     destination = config.destination.model_dump() if config.destination else existing.get("destination")
     if destination != existing.get("destination"):
@@ -698,12 +900,12 @@ def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
     if widget is None:
         raise HTTPException(404, "Este gráfico ya no forma parte del tablero. Actualizá la página.")
     # Only additional filters are accepted. A viewer cannot change the chart, sheet or saved restrictions.
-    source = source_for(workspace["source_id"], workspace["owner"])
+    source = source_for(widget.get("source_id") or workspace["source_id"], workspace["owner"])
     config = ChartConfig.model_validate(widget["config"])
     if source["kind"] == "google" and source.get("access_mode") != "public":
         google_token = google_token or google_oauth.access_token(db(), owner)
     frame, metadata = table_from_source(source, config, google_token)
-    frame = filter_frame(frame, config.filters)
+    frame = restrict_frame(frame, config.model_dump())
     configured_columns = workspace.get("filter_columns")
     if configured_columns is not None:
         allowed = set(configured_columns)
@@ -716,15 +918,19 @@ def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
                 cfg.get("x_col", ""), cfg.get("y_col", ""), *cfg.get("y_cols", []), cfg.get("group_col", ""),
                 cfg.get("latitude_col", ""), cfg.get("longitude_col", ""), cfg.get("label_col", ""), cfg.get("size_col", ""),
                 *cfg.get("map_metric_cols", []), *cfg.get("filters", {}),
+                *([cfg['map_lookup']['column'], cfg['map_lookup'].get('category_col', '')] if cfg.get('map_lookup') else []),
             ])
     if any(column not in allowed for column in filters):
         raise HTTPException(422, "Solo podés filtrar por los campos habilitados en esta sección.")
     applicable = {column: selection for column, selection in filters.items() if column in frame.columns}
-    options = contextual_filter_options(frame, allowed, applicable, workspace.get("filter_sorts", {}))
+    option_frame = restrict_frame(frame, {"filter_rules": workspace.get("filter_option_rules", [])})
+    options = contextual_filter_options(option_frame, allowed, applicable, workspace.get("filter_sorts", {}), 5000 if config.google_summary else 100)
     for column, option in options.items():
         option['type'] = metadata['column_meta'][column]['type']
     filtered_frame = apply_view_filters(frame, applicable)
-    result = chart(filtered_frame, {**config.model_dump(), "filters": {}})
+    result = chart(filtered_frame, {**config.model_dump(), "filters": {}, "filter_rules": []})
+    if metadata.get('row_count_column'):
+        result['filtered_rows'] = int(filtered_frame[metadata['row_count_column']].sum())
     result["filter_options"] = options
     result["ignored_filters"] = [column for column, selection in filters.items()
                                  if filter_selection(selection)[1] and column not in frame.columns]
