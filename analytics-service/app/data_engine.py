@@ -19,7 +19,7 @@ MAX_POINTS = 10_000
 MAX_MAP_POINTS = 2_000
 CHART_TYPES = {"bar", "horizontal", "stacked", "line", "area", "scatter", "pie", "donut", "histogram", "box", "heatmap", "table", "indicator", "map"}
 MULTI_METRIC_CHART_TYPES = {"bar", "horizontal", "stacked", "line"}
-SORT_AGGREGATIONS = {"alphabetical", "sum", "max", "min", "count", "distinct"}
+SORT_AGGREGATIONS = {"alphabetical", "sum", "mean", "median", "max", "min", "count", "distinct"}
 
 class DataError(ValueError):
     pass
@@ -289,6 +289,10 @@ def _sort_score(values, aggregation):
         return None
     if aggregation == "sum":
         return sum(numeric)
+    if aggregation == 'mean':
+        return sum(numeric) / len(numeric)
+    if aggregation == 'median':
+        return float(np.median(numeric))
     if aggregation == "max":
         return max(numeric)
     if aggregation == "min":
@@ -472,10 +476,18 @@ def restrict_frame(frame, cfg):
         else:
             raise DataError('La condición del filtro no es válida.')
         frame = frame[mask]
+    for column in cfg.get('chart_filters') or {}:
+        if column not in frame:
+            raise DataError(f'El filtro propio necesita la columna {column}.')
+    if cfg.get('chart_filters'):
+        frame = apply_view_filters(frame, cfg['chart_filters'])
     return frame
 
 
 def limit_categories(result, cfg, frame=None):
+    if frame is not None:
+        from app.chart_calculations import regroup_other
+        return regroup_other(result, cfg, frame, chart)
     limit = cfg.get('category_limit')
     if not limit or len(result['labels']) <= limit:
         return result
@@ -554,6 +566,13 @@ def summary_table(frame, cfg, dimensions, metrics):
 
 
 def chart(frame, cfg):
+    if any(cfg.get(key) for key in ('calculated_fields', 'display_condition', 'chart_filters', 'table_unique', 'hide_zero')) or cfg.get('bar_labels', 'none') != 'none' or cfg.get('table_columns') is not None or cfg.get('aggregation') == 'none':
+        from app.chart_calculations import calculate
+        return calculate(frame, cfg, production_chart)
+    return production_chart(frame, cfg)
+
+
+def production_chart(frame, cfg):
     if cfg.get('metric_ratio'):
         from .metric_ratio import ratio_chart
         return ratio_chart(frame, cfg)
@@ -797,7 +816,7 @@ def chart(frame, cfg):
                     **({"group": group_value} if group else {}),
                     "data": [matrix.get((label, group_value)) for label in labels],
                 })
-        return limit_categories({"labels": labels, "datasets": datasets, "filtered_rows": rows, "warnings": warnings}, cfg)
+        return limit_categories({"labels": labels, "datasets": datasets, "filtered_rows": rows, "warnings": warnings}, cfg, aggregate_frame)
     numeric_required = agg not in {"count", "distinct"} or kind in {"scatter", "histogram", "box"}
     if numeric_required:
         if any(v is not None and not isinstance(v, (int, float, bool)) for v in frame[y]):

@@ -197,8 +197,7 @@ class MigrationSemanticsTests(unittest.TestCase):
         self.assertEqual(result['labels'], ['A', 'C', 'Otros'])
         self.assertEqual(result['datasets'][0]['data'], [10, 7, 5])
         self.assertEqual(sum(result['datasets'][0]['data']), 22)
-        with self.assertRaises(DataError):
-            chart(frame, {**cfg, 'aggregation': 'mean'})
+        self.assertEqual(chart(frame, {**cfg, 'aggregation': 'mean'})['datasets'][0]['data'], [10, 7, 2.5])
 
     def test_summary_table_aggregates_without_exposing_detail(self):
         frame, _ = table([['Origen', 'Destino', 'Documento'], ['Interior', 'Capital', 'privado-1'],

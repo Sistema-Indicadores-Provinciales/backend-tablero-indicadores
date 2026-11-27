@@ -30,6 +30,9 @@ from app.section_access import (create_section, section_options, require_admin, 
 from app.google_public import parse_link, read_public_rows, SHEET_NAME
 from app.formosa_boundary import load_formosa_boundary
 from app.section_snapshots import SectionSnapshot, snapshots
+from app import editor_storage
+from app.expression_engine import CalculationPlan, ExpressionError
+from app.chart_dependencies import validate_dependencies
 
 BASE = Path(__file__).resolve().parents[1]
 load_dotenv(BASE.parent / ".env", override=False)
@@ -335,7 +338,7 @@ class ReadConfig(BaseModel):
 class SortConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     field: str = Field(min_length=1, max_length=500)
-    aggregation: str = Field(default="alphabetical", pattern=r"^(alphabetical|sum|max|min|count|distinct)$")
+    aggregation: str = Field(default="alphabetical", pattern=r"^(alphabetical|sum|mean|median|max|min|count|distinct)$")
     direction: str = Field(default="asc", pattern=r"^(asc|desc)$")
     tie_order: list[Annotated[str, Field(max_length=2000)]] = Field(default_factory=list, max_length=500)
     tie_breaker: Literal['alphabetical', 'source_heap'] = 'alphabetical'
@@ -395,7 +398,53 @@ class MapLookup(BaseModel):
     sized: bool = True
 
 
+class CalculatedField(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    name: str = Field(min_length=1, max_length=200)
+    expression: str = Field(min_length=1, max_length=2000)
+    mode: Literal['row', 'aggregate'] = 'row'
+    guide: dict | None = None
+
+
+class DisplayCondition(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    expression: str = Field(min_length=1, max_length=2000)
+    alternative: str = Field(default='—', max_length=200)
+
+
+class NumericFormat(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    style: Literal['number', 'percent', 'literal'] = 'number'
+    decimals: int = Field(default=0, ge=0, le=20)
+    grouping: bool = True
+    prefix: str = Field(default='', max_length=100)
+    suffix: str = Field(default='', max_length=100)
+    empty: str = Field(default='—', max_length=100)
+    decimal_separator: Literal[',', '.'] = ','
+    thousands_separator: Literal[',', '.', ' '] = '.'
+
+
 class ChartConfig(ReadConfig):
+    calculated_fields: list[CalculatedField] = Field(default_factory=list, max_length=20)
+    display_condition: DisplayCondition | None = None
+    hide_zero: bool = False
+    numeric_formats: dict[str, NumericFormat] = Field(default_factory=dict, max_length=MAX_COLS)
+    empty_text: str = Field(default='—', max_length=100)
+    table_columns: list[str] | None = Field(default=None, max_length=MAX_COLS)
+    table_unique: bool = False
+    chart_filters: dict[str, dict] = Field(default_factory=dict, max_length=20)
+    selected_filters: dict[str, list[str] | dict] = Field(default_factory=dict, max_length=20, exclude=True)
+    bar_labels: Literal['none', 'value', 'second_metric', 'percent_stack'] = 'none'
+
+    @field_validator('chart_filters', 'selected_filters')
+    @classmethod
+    def bounded_filter_selections(cls, selections):
+        for column, selection in selections.items():
+            _, values = filter_selection(selection)
+            if len(column) > 500 or len(values) > 100 or any(not isinstance(value, str) or len(value) > 2000 for value in values):
+                raise ValueError('Cada filtro admite hasta 100 valores de texto y nombres de hasta 500 caracteres.')
+        return selections
+
     chart_type: str = "bar"
     aggregation: str = "sum"
     x_col: str = ""
@@ -488,6 +537,7 @@ def table_from_source(doc, config, google_token):
 def read_config_key(config: ReadConfig) -> str:
     """Identify a parsed table without considering chart-only settings."""
     read = config.model_dump(include={"sheet", "header_row", "decimal", "types", "computed_columns", "aggregate_join", "google_summary"})
+    read['computed_columns'] = list((read.get('computed_columns') or {}).items())
     return json.dumps(read, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
@@ -500,16 +550,23 @@ def workspace_fingerprint(workspace: dict) -> str:
         "filter_sorts": workspace.get("filter_sorts"),
         "filter_option_rules": workspace.get("filter_option_rules"),
         "column_aliases": workspace.get("column_aliases"),
+        'preparation_order': [list((item.get('config', {}).get('computed_columns') or {}).items()) for item in workspace.get('widgets', [])],
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
 def workspace_view_payload(workspace: dict, source: dict, owner: str) -> dict:
-    sources = [source, *[source_for(identifier, workspace["owner"]) for identifier in {
+    sources = [source]
+    for identifier in {
         widget.get("source_id") for widget in workspace.get("widgets", [])
         if widget.get("source_id") and widget["source_id"] != workspace["source_id"]
-    }]]
+    }:
+        try:
+            sources.append(source_for(identifier, workspace['owner']))
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
     return {
         **public(workspace),
         "can_edit": workspace["owner"] == owner,
@@ -530,8 +587,10 @@ def validate_view_filters(filters: dict) -> None:
         raise HTTPException(422, str(exc)) from exc
 
 
-def widget_read_key(widget: dict) -> str:
+def widget_read_key(widget: dict, default_source_id=None) -> str:
     read_key = read_config_key(ChartConfig.model_validate(widget["config"]))
+    if default_source_id is not None:
+        return json.dumps([widget.get('source_id') or default_source_id, read_key])
     return json.dumps([widget["source_id"], read_key]) if widget.get("source_id") else read_key
 
 
@@ -539,21 +598,25 @@ def load_section_snapshot(workspace: dict, source: dict, viewer: str, google_tok
     """Read each distinct sheet configuration once and retain no credential."""
     sources = {workspace["source_id"]: source}
     tables: dict[str, tuple[object, dict]] = {}
+    errors = {}
     for widget in workspace.get("widgets", []):
         config = ChartConfig.model_validate(widget["config"])
-        key = widget_read_key(widget)
+        key = widget_read_key(widget, workspace['source_id'])
         if key in tables:
             continue
         identifier = widget.get("source_id") or workspace["source_id"]
-        if identifier not in sources:
-            sources[identifier] = source_for(identifier, workspace["owner"])
-        widget_source = sources[identifier]
-        if widget_source["kind"] == "google" and widget_source.get("access_mode") != "public":
-            google_token = google_token or google_oauth.access_token(db(), viewer)
-        frame, metadata = table_from_source(widget_source, config, google_token)
-        metadata.pop("raw_preview", None)
-        tables[key] = (frame, metadata)
-    return SectionSnapshot(uuid4().hex, workspace["_id"], viewer, workspace_fingerprint(workspace), tables, monotonic())
+        try:
+            if identifier not in sources:
+                sources[identifier] = source_for(identifier, workspace["owner"])
+            widget_source = sources[identifier]
+            if widget_source["kind"] == "google" and widget_source.get("access_mode") != "public":
+                google_token = google_token or google_oauth.access_token(db(), viewer)
+            frame, metadata = table_from_source(widget_source, config, google_token)
+            metadata.pop("raw_preview", None)
+            tables[key] = (frame, metadata)
+        except (HTTPException, DataError) as exc:
+            errors[widget['id']] = str(exc.detail) if isinstance(exc, HTTPException) else str(exc)
+    return SectionSnapshot(uuid4().hex, workspace["_id"], viewer, workspace_fingerprint(workspace), tables, monotonic(), errors, workspace['source_id'])
 
 
 def section_allowed_columns(workspace: dict, snapshot: SectionSnapshot) -> set[str]:
@@ -563,7 +626,9 @@ def section_allowed_columns(workspace: dict, snapshot: SectionSnapshot) -> set[s
     allowed: set[str] = set()
     for saved in workspace.get("widgets", []):
         config = ChartConfig.model_validate(saved["config"])
-        frame, _ = snapshot.tables[widget_read_key(saved)]
+        if saved['id'] in snapshot.errors:
+            continue
+        frame, _ = snapshot.tables[widget_read_key(saved, snapshot.default_source_id)]
         if config.chart_type == "table":
             allowed.update(frame.columns)
         allowed.update([
@@ -578,14 +643,16 @@ def section_allowed_columns(workspace: dict, snapshot: SectionSnapshot) -> set[s
 
 def render_snapshot_widget(widget: dict, snapshot: SectionSnapshot, filters: dict, allowed: set[str], filter_sorts: dict, filter_option_rules: list | None = None, options_cache: dict | None = None) -> dict:
     """Calculate one widget from an already loaded table."""
+    if widget['id'] in snapshot.errors:
+        raise DataError(snapshot.errors[widget['id']])
     config = ChartConfig.model_validate(widget["config"])
-    frame, metadata = snapshot.tables[widget_read_key(widget)]
+    frame, metadata = snapshot.tables[widget_read_key(widget, snapshot.default_source_id)]
     frame = restrict_frame(frame, config.model_dump())
     applicable = {column: selection for column, selection in filters.items() if column in frame.columns}
     # Control restrictions limit available choices, not a chart's measurements.
     # This cache lives only for this render/viewer/filter selection. Only charts
     # with identical sources, parsing and saved restrictions share their facets.
-    option_key = (widget_read_key(widget), json.dumps(config.model_dump(include={'filters', 'filter_rules'}), sort_keys=True))
+    option_key = (widget_read_key(widget, snapshot.default_source_id), json.dumps(config.model_dump(include={'filters', 'filter_rules', 'chart_filters'}), sort_keys=True))
     options = options_cache.get(option_key) if options_cache is not None else None
     if options is None:
         option_frame = restrict_frame(frame, {"filter_rules": filter_option_rules or []})
@@ -595,7 +662,7 @@ def render_snapshot_widget(widget: dict, snapshot: SectionSnapshot, filters: dic
         if options_cache is not None:
             options_cache[option_key] = options
     filtered_frame = apply_view_filters(frame, applicable)
-    result = chart(filtered_frame, {**config.model_dump(), "filters": {}, "filter_rules": []})
+    result = chart(filtered_frame, {**config.model_dump(), "filters": {}, "filter_rules": [], 'selected_filters': filters})
     if metadata.get('row_count_column'):
         result['filtered_rows'] = int(filtered_frame[metadata['row_count_column']].sum())
     result["filter_options"] = options
@@ -639,6 +706,7 @@ def merge_section_filter_options(rendered: dict[str, dict], filters: dict) -> di
 def render_section_snapshot(workspace: dict, snapshot: SectionSnapshot, filters: dict) -> tuple[dict, dict]:
     """Render all widgets while isolating a chart-specific data error."""
     allowed = section_allowed_columns(workspace, snapshot)
+    validate_single_filters(workspace, filters)
     if any(column not in allowed for column in filters):
         raise HTTPException(422, "Solo podés filtrar por los campos habilitados en esta sección.")
     rendered: dict[str, dict] = {}
@@ -651,6 +719,14 @@ def render_section_snapshot(workspace: dict, snapshot: SectionSnapshot, filters:
             rendered[widget["id"]] = {"error": str(exc) or "No se pudo generar este gráfico."}
     return rendered, merge_section_filter_options(rendered, filters)
 
+
+def validate_single_filters(workspace, filters):
+    for column, selection in filters.items():
+        if workspace.get('filter_settings', {}).get(column) == 'single':
+            mode, values = filter_selection(selection)
+            if mode != 'include' or len(values) > 1:
+                raise HTTPException(422, f'El filtro {column} requiere una única opción incluida.')
+
 @router.post("/sources/{source_id}/preview")
 def preview(source_id: str, config: ReadConfig, owner=Depends(user), x_google_access_token: str = Header(default="")):
     return load_table(source_id, owner, config, x_google_access_token)[1]
@@ -658,11 +734,43 @@ def preview(source_id: str, config: ReadConfig, owner=Depends(user), x_google_ac
 @router.post("/sources/{source_id}/chart")
 def generate(source_id: str, config: ChartConfig, owner=Depends(user), x_google_access_token: str = Header(default="")):
     frame, metadata = load_table(source_id, owner, config, x_google_access_token)
-    result = chart(frame, config.model_dump())
+    selected = {key: value for key, value in config.selected_filters.items() if key in frame}
+    frame = apply_view_filters(frame, selected)
+    result = chart(frame, {**config.model_dump(), 'selected_filters': config.selected_filters})
     if metadata.get('row_count_column'):
         result['filtered_rows'] = int(restrict_frame(frame, config.model_dump())[metadata['row_count_column']].sum())
     result["warnings"] = metadata["warnings"] + result.get("warnings", [])
     return result
+
+
+class FormulaTrial(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    config: ChartConfig
+    field: CalculatedField
+
+
+@router.post('/sources/{source_id}/formula-trial')
+def formula_trial(source_id: str, body: FormulaTrial, owner=Depends(user), x_google_access_token: str = Header(default='')):
+    frame, _ = load_table(source_id, owner, body.config, x_google_access_token)
+    selected = body.config.selected_filters
+    definitions = [field.model_dump() for field in body.config.calculated_fields if field.name != body.field.name]
+    definitions.append(body.field.model_dump())
+    try:
+        plan = CalculationPlan(definitions, frame.columns)
+        prepared = plan.rows(frame, selected)
+        prepared = restrict_frame(prepared, body.config.model_dump())
+        prepared = apply_view_filters(prepared, body.config.chart_filters)
+        prepared = apply_view_filters(prepared, {key: value for key, value in selected.items() if key in prepared})
+        sample = prepared.head(20)
+        # Source columns are retained so expanded dependencies use this same sample.
+        value = plan.value(body.field.name, sample, selected)
+        from app.data_engine import safe
+        from pandas import Series
+        values = [safe(item) for item in value] if isinstance(value, Series) else [safe(value)]
+        return {'sample': True, 'sample_rows': len(sample), 'matching_rows': len(prepared),
+                'source_id': source_id, 'sheet': body.config.sheet, 'mode': body.field.mode, 'values': values}
+    except ExpressionError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 class Widget(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -682,6 +790,7 @@ class Destination(BaseModel):
 class Workspace(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str = Field(min_length=1, max_length=200)
+    filter_settings: dict[str, Literal['single', 'multiple']] = Field(default_factory=dict, max_length=20)
     source_id: str = Field(max_length=500)
     widgets: list[Widget] = Field(max_length=30)
     filter_columns: list[Annotated[str, Field(min_length=1, max_length=500)]] | None = Field(default=None, max_length=20)
@@ -725,15 +834,69 @@ def workspaces(owner=Depends(user)):
     return [public(d) for d in db().analytics_workspaces.find({"owner": owner, "deletedAt": None}).limit(200)]
 
 @router.post("/workspaces")
-def save_workspace(config: Workspace, owner=Depends(user)):
+def save_workspace(config: Workspace, owner=Depends(user), x_google_access_token: str = Header(default='')):
     source_for(config.source_id, owner)
     for identifier in {widget.source_id for widget in config.widgets if widget.source_id}:
         source_for(identifier, owner)
     if config.destination:
         validate_destination(db(), config.destination.model_dump(), current_user(db(), owner))
+    validate_editor_data(config.model_dump(exclude_none=True), None, owner, x_google_access_token)
     doc = {"_id": uuid4().hex, "owner": owner, **config.model_dump(exclude_none=True)}
     db().analytics_workspaces.insert_one(doc)
-    return public(doc)
+    return {**public(doc), 'editor_document': editor_storage.editor_document(doc), 'editor_revision': editor_storage.revision(doc)}
+
+
+def validate_editor_data(candidate, existing, owner, google_token=''):
+    settings, defaults = candidate.get('filter_settings', {}), candidate.get('default_filters', {})
+    for column, mode in settings.items():
+        if mode == 'single' and len(defaults.get(column, [])) > 1:
+            raise HTTPException(422, f'El filtro individual {column} admite como máximo un valor inicial.')
+    previous = {item['id']: item for item in (existing or {}).get('widgets', [])}
+    changed_section = not existing or any(not editor_storage.identical(candidate.get(key), existing.get(key)) for key in ['source_id', 'filter_columns', 'filter_settings', 'default_filters'])
+    tables = {}
+    for widget in candidate.get('widgets', []):
+        old = previous.get(widget['id'])
+        changed = changed_section or old is None or not editor_storage.identical(old.get('config'), widget.get('config')) or old.get('source_id') != widget.get('source_id')
+        if not changed:
+            continue
+        cfg = ChartConfig.model_validate(editor_storage.projection(ChartConfig, widget['config']))
+        validate_dependencies(cfg.model_dump())
+        identifier = widget.get('source_id') or candidate['source_id']
+        # Legacy configurations keep their existing save behavior; newly edited
+        # calculation features are checked against the authorized source.
+        source_for(identifier, owner)
+        if not (cfg.calculated_fields or cfg.display_condition or cfg.aggregation == 'none' or cfg.table_columns is not None or cfg.chart_filters):
+            continue
+        key = (identifier, read_config_key(cfg))
+        if key not in tables:
+            tables[key] = load_table(identifier, owner, cfg, google_token)[0]
+        frame = tables[key]
+        frame = apply_view_filters(frame, {column: values for column, values in defaults.items() if column in frame})
+        try:
+            plan = CalculationPlan([field.model_dump() for field in cfg.calculated_fields], frame.columns)
+            for name in plan.terms:
+                plan.value(name, frame, defaults)
+        except ExpressionError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        chart(frame, {**cfg.model_dump(), 'selected_filters': defaults})
+
+
+@router.patch('/workspaces/{workspace_id}')
+def edit_workspace(workspace_id: str, body: editor_storage.EditorChanges, owner=Depends(user), x_google_access_token: str = Header(default='')):
+    existing = owned_workspace(db(), workspace_id, owner)
+    if editor_storage.revision(existing) != body.revision:
+        raise HTTPException(409, 'La sección cambió en otra edición. Conservá tu borrador y recargá antes de guardar.')
+    candidate = editor_storage.apply(existing, body.changes, ChartConfig, Widget, Workspace)
+    update = editor_storage.update_operations(existing, candidate)
+    if not update:
+        return {**public(existing), 'editor_document': editor_storage.editor_document(existing), 'editor_revision': body.revision}
+    validate_editor_data(candidate, existing, owner, x_google_access_token)
+    result = db().analytics_workspaces.update_one(editor_storage.atomic_filter(existing), update)
+    if not result.matched_count:
+        raise HTTPException(409, 'La sección cambió durante el guardado. Tu borrador se conserva.')
+    if workspace_fingerprint(existing) != workspace_fingerprint(candidate):
+        snapshots.discard_workspace(workspace_id)
+    return {**public(candidate), 'editor_document': editor_storage.editor_document(candidate), 'editor_revision': editor_storage.revision(candidate)}
 
 @router.put("/workspaces/{workspace_id}")
 def update_workspace(workspace_id: str, config: Workspace, owner=Depends(user)):
@@ -760,7 +923,7 @@ def update_workspace(workspace_id: str, config: Workspace, owner=Depends(user)):
 
 class Publication(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    icon: str = Field(default="material-symbols:bar-chart-rounded", max_length=100, pattern=r"^[a-z0-9:_-]+$")
+    icon: str | None = Field(default=None, max_length=100, pattern=r"^[a-z0-9:_-]+$")
     recipientIds: list[str] | None = Field(default=None, max_length=10000)
 
 
@@ -827,6 +990,8 @@ def publish_workspace(workspace_id: str, config: Publication, owner=Depends(user
 @router.get("/workspaces/{workspace_id}")
 def get_workspace(workspace_id: str, owner=Depends(user)):
     workspace = public(owned_workspace(db(), workspace_id, owner))
+    workspace['editor_document'] = editor_storage.editor_document(workspace)
+    workspace['editor_revision'] = editor_storage.revision(workspace)
     if workspace.get("destination"):
         _, section = target_section(db(), workspace["destination"])
         workspace["name"] = section.get("name") or workspace["name"]
@@ -896,6 +1061,7 @@ def render_workspace_section(workspace_id: str, body: SectionRenderRequest, owne
 
 def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
     workspace = view_workspace(db(), workspace_id, owner)
+    validate_single_filters(workspace, filters)
     widget = next((w for w in workspace["widgets"] if w["id"] == widget_id), None)
     if widget is None:
         raise HTTPException(404, "Este gráfico ya no forma parte del tablero. Actualizá la página.")
@@ -928,7 +1094,7 @@ def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
     for column, option in options.items():
         option['type'] = metadata['column_meta'][column]['type']
     filtered_frame = apply_view_filters(frame, applicable)
-    result = chart(filtered_frame, {**config.model_dump(), "filters": {}, "filter_rules": []})
+    result = chart(filtered_frame, {**config.model_dump(), "filters": {}, "filter_rules": [], 'selected_filters': filters})
     if metadata.get('row_count_column'):
         result['filtered_rows'] = int(filtered_frame[metadata['row_count_column']].sum())
     result["filter_options"] = options

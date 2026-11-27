@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from threading import RLock
 from time import monotonic
 from typing import Any
@@ -27,6 +27,8 @@ class SectionSnapshot:
     fingerprint: str
     tables: dict[str, tuple[Any, dict[str, Any]]]
     last_used_at: float
+    errors: dict[str, str] = field(default_factory=dict)
+    default_source_id: str | None = None
 
 
 class SectionSnapshotStore:

@@ -115,7 +115,11 @@ def publish(database, workspace, account, icon, recipient_ids=None):
     recipients = validated_recipients(database, account, recipient_ids)
     dashboard, section = ensure_menu(database, workspace, account)
     if not workspace.get("destination"):
-        database.dashboards.update_one({"_id": dashboard["_id"]}, {"$set": {"name": workspace["name"], "icon": icon}})
+        changed = {'name': workspace['name']}
+        if icon is not None:
+            changed['icon'] = icon
+        if any(dashboard.get(key) != value for key, value in changed.items()):
+            database.dashboards.update_one({"_id": dashboard["_id"]}, {"$set": changed})
     if recipients is not None:
         apply_recipients(database, dashboard["_id"], section["_id"], recipients)
     return publication_options(database, account, workspace)

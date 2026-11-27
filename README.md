@@ -97,3 +97,18 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+## Ampliación del generador sobre producción
+
+La rama `codex/generador-educacion-produccion` parte exclusivamente de `feat/arreglo-users`. Se amplían los mecanismos del servicio de análisis sin migrar las configuraciones existentes.
+
+- `GET /v2/workspaces/{id}` entrega el documento original para el editor y su `editor_revision`.
+- `PATCH /v2/workspaces/{id}` recibe esa revisión y operaciones explícitas sobre propiedades o gráficos identificados por ID. Un guardado sin cambios no escribe; editar un título escribe únicamente esa propiedad. La comparación atómica detecta conflictos y devuelve 409.
+- `POST /v2/sources/{id}/formula-trial` prueba un campo sobre hasta 20 registros después de aplicar las restricciones y los filtros relevantes. La respuesta identifica la muestra y su lectura.
+- Los lectores, permisos, filtros, condiciones originales, snapshots y publicación de producción se mantienen. El intérprete y la capa de cálculos son módulos independientes.
+
+Los campos nuevos utilizan `calculated_fields: [{name, expression, mode}]`. El modo `row` evalúa cada registro antes de agregar; `aggregate` utiliza la combinación definida por la expresión. `display_condition` se configura por separado. No se convierten las fórmulas ni los mecanismos especializados ya guardados.
+
+La guía de uso y el inventario completo están en `docs/generador-educacion-produccion.md` del frontend. Las pruebas usan fuentes sintéticas, Mongo en memoria y el catálogo de Salud incluido en producción; no requieren escribir en la base real.
+
+Desde `analytics-service`: `python -m unittest discover -s tests -q`. Para compilar Nest: `npm run build`. El endpoint PUT anterior sigue disponible; los clientes antiguos que no proporcionan una revisión no tienen el control de conflictos del PATCH nuevo.
