@@ -554,6 +554,23 @@ def summary_table(frame, cfg, dimensions, metrics):
 
 
 def chart(frame, cfg):
+    if cfg.get('calculated_fields'):
+        from .education_calculations import education_chart
+        return education_chart(frame, cfg)
+    if cfg.get('indicator_row_limit') and cfg.get('chart_type') == 'indicator':
+        limit = cfg['indicator_row_limit']
+        column = limit['column']
+        if column not in frame:
+            raise DataError('La condición del indicador usa una columna que no existe.')
+        selected = restrict_frame(frame, cfg)
+        if selected[column].count() > 1:
+            return {'labels': ['Total'], 'datasets': [{'label': cfg.get('y_col', ''), 'data': [None]}],
+                    'filtered_rows': len(selected), 'warnings': []}
+        result = chart(selected, {**cfg, 'filters': {}, 'filter_rules': [], 'indicator_row_limit': None})
+        for dataset in result['datasets']:
+            if limit['hide_zero'] and dataset['data'] == [0]:
+                dataset['data'] = [None]
+        return result
     if cfg.get('metric_ratio'):
         from .metric_ratio import ratio_chart
         return ratio_chart(frame, cfg)
@@ -741,8 +758,14 @@ def chart(frame, cfg):
     if kind == "table":
         # Las tablas antiguas mantienen todas las columnas; al agregar métricas,
         # la selección pasa a definir explícitamente sus columnas visibles.
-        cols = list(dict.fromkeys([x, *metrics] + ([group] if group else []))) if additional_metrics else list(frame.columns)
-        return {"labels": [], "datasets": [], "filtered_rows": rows, "columns": cols, "records": [{c: safe(v) for c, v in r.items()} for r in frame[cols].head(500).to_dict("records")], "warnings": ["Vista limitada a 500 filas."] if rows > 500 else []}
+        cols = cfg.get('table_columns') or ([x, *metrics, *([group] if group else [])] if additional_metrics else list(frame.columns))
+        cols = list(dict.fromkeys(cols))
+        if any(column not in frame for column in cols):
+            raise DataError('Elegí columnas válidas para esta tabla.')
+        records = frame[cols].drop_duplicates() if cfg.get('table_distinct') else frame[cols]
+        return {"labels": [], "datasets": [], "filtered_rows": rows, "columns": cols,
+                "records": [{c: safe(v) for c, v in r.items()} for r in records.head(500).to_dict("records")],
+                "warnings": ["Vista limitada a 500 filas."] if len(records) > 500 else []}
     if not rows:
         return {"labels": [], "datasets": [], "filtered_rows": 0, "warnings": []}
     if multiple_metrics:

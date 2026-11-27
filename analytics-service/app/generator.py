@@ -30,6 +30,7 @@ from app.section_access import (create_section, section_options, require_admin, 
 from app.google_public import parse_link, read_public_rows, SHEET_NAME
 from app.formosa_boundary import load_formosa_boundary
 from app.section_snapshots import SectionSnapshot, snapshots
+from app.stored_chart_config import adapt_stored_workspace
 
 BASE = Path(__file__).resolve().parents[1]
 load_dotenv(BASE.parent / ".env", override=False)
@@ -355,6 +356,12 @@ class IndicatorCondition(BaseModel):
     minimum: float = Field(allow_inf_nan=False)
 
 
+class IndicatorRowLimit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    column: str = Field(min_length=1, max_length=500)
+    hide_zero: bool
+
+
 class MetricCondition(BaseModel):
     model_config = ConfigDict(extra="forbid")
     column: str = Field(min_length=1, max_length=500)
@@ -395,6 +402,13 @@ class MapLookup(BaseModel):
     sized: bool = True
 
 
+class NumberPresentation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    style: Literal['decimal', 'percentage', 'percentage_points']
+    digits: int = Field(strict=True, ge=0, le=6)
+    group_digits: bool = Field(strict=True)
+
+
 class ChartConfig(ReadConfig):
     chart_type: str = "bar"
     aggregation: str = "sum"
@@ -402,18 +416,22 @@ class ChartConfig(ReadConfig):
     y_col: str = ""
     y_cols: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=19)
     pie_label_mode: str = Field(default="percent", pattern=r"^(percent|value)$")
+    bar_label_mode: Literal['value', 'second_metric', 'percent_of_stack'] | None = None
     group_col: str = ""
     date_bucket: str = "none"
     filters: dict[str, list[str]] = Field(default_factory=dict)
     filter_rules: list[FilterRule] = Field(default_factory=list, max_length=50)
     count_col: str = Field(default="", max_length=500)
     indicator_condition: IndicatorCondition | None = None
+    indicator_row_limit: IndicatorRowLimit | None = None
     indicator_rules: list[FilterRule] = Field(default_factory=list, max_length=50)
     indicator_sum_rules: list[FilterRule] = Field(default_factory=list, max_length=50)
     indicator_addends: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=19)
     indicator_text_column: str = Field(default='', max_length=500)
     indicator_single_value_columns: list[str] = Field(default_factory=list, max_length=20)
     value_format: Literal['number', 'percent', 'percent_points'] = 'number'
+    number_formats: dict[Annotated[str, Field(min_length=1, max_length=500)], NumberPresentation] | None = Field(default=None, max_length=MAX_COLS)
+    calculated_fields: dict[Annotated[str, Field(min_length=1, max_length=500)], str] | None = Field(default=None, max_length=2)
     indicator_divisor: float = Field(default=1, gt=0, allow_inf_nan=False)
     indicator_rounding: str = Field(default='none', pattern=r'^(none|floor|ceil)$')
     indicator_lookup: IndicatorLookup | None = None
@@ -424,6 +442,8 @@ class ChartConfig(ReadConfig):
     metric_condition: MetricCondition | None = None
     metric_ratio: MetricRatio | None = None
     table_mode: str = Field(default='rows', pattern=r'^(rows|summary)$')
+    table_columns: list[Annotated[str, Field(min_length=1, max_length=500)]] | None = Field(default=None, min_length=1, max_length=20)
+    table_distinct: bool | None = None
     table_dimensions: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=20)
     table_sorts: list[SortConfig] = Field(default_factory=list, max_length=5)
     preserve_empty_categories: bool = False
@@ -439,6 +459,14 @@ class ChartConfig(ReadConfig):
     map_mode: str = Field(default="markers", pattern=r"^(markers|circles)$")
     map_metric_cols: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(default_factory=list, max_length=20)
     map_lookup: MapLookup | None = None
+
+    @field_validator("calculated_fields")
+    @classmethod
+    def supported_education_calculations(cls, fields):
+        from .education_calculations import CALCULATIONS
+        if fields and any(formula not in CALCULATIONS for formula in fields.values()):
+            raise ValueError("La sección usa un cálculo que no está disponible.")
+        return fields
 
 def load_table(source_id, owner, config, google_token):
     doc = source_for(source_id, owner)
@@ -505,13 +533,25 @@ def workspace_fingerprint(workspace: dict) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
+def public_workspace(workspace: dict) -> dict:
+    result = public(adapt_stored_workspace(workspace))
+    formats = result.pop("widget_number_formats", {})
+    if formats:
+        result["widgets"] = [
+            {**widget, "config": {**widget["config"], "number_formats": formats[widget["id"]]}}
+            if widget["id"] in formats else widget
+            for widget in result["widgets"]
+        ]
+    return result
+
+
 def workspace_view_payload(workspace: dict, source: dict, owner: str) -> dict:
     sources = [source, *[source_for(identifier, workspace["owner"]) for identifier in {
         widget.get("source_id") for widget in workspace.get("widgets", [])
         if widget.get("source_id") and widget["source_id"] != workspace["source_id"]
     }]]
     return {
-        **public(workspace),
+        **public_workspace(workspace),
         "can_edit": workspace["owner"] == owner,
         "source_kind": source["kind"],
         "source_access_mode": source.get("access_mode"),
@@ -720,9 +760,22 @@ class Workspace(BaseModel):
             raise ValueError("El campo configurado para ordenar un filtro no es válido.")
         return sorts
 
+    def storage_document(self) -> dict:
+        document = self.model_dump(exclude_none=True)
+        # Older analytics services strictly validate each stored chart config.
+        # Keep display-only settings at workspace level, keyed by stable widget ID.
+        formats = {}
+        for widget in document["widgets"]:
+            columns = widget["config"].pop("number_formats", None)
+            if columns:
+                formats[widget["id"]] = columns
+        if formats:
+            document["widget_number_formats"] = formats
+        return document
+
 @router.get("/workspaces")
 def workspaces(owner=Depends(user)):
-    return [public(d) for d in db().analytics_workspaces.find({"owner": owner, "deletedAt": None}).limit(200)]
+    return [public_workspace(d) for d in db().analytics_workspaces.find({"owner": owner, "deletedAt": None}).limit(200)]
 
 @router.post("/workspaces")
 def save_workspace(config: Workspace, owner=Depends(user)):
@@ -731,9 +784,9 @@ def save_workspace(config: Workspace, owner=Depends(user)):
         source_for(identifier, owner)
     if config.destination:
         validate_destination(db(), config.destination.model_dump(), current_user(db(), owner))
-    doc = {"_id": uuid4().hex, "owner": owner, **config.model_dump(exclude_none=True)}
+    doc = {"_id": uuid4().hex, "owner": owner, **config.storage_document()}
     db().analytics_workspaces.insert_one(doc)
-    return public(doc)
+    return public_workspace(doc)
 
 @router.put("/workspaces/{workspace_id}")
 def update_workspace(workspace_id: str, config: Workspace, owner=Depends(user)):
@@ -748,14 +801,17 @@ def update_workspace(workspace_id: str, config: Workspace, owner=Depends(user)):
         dashboard, section = target_section(db(), destination)
         if section.get("workspaceId") not in (None, workspace_id):
             raise HTTPException(409, "La sección ya tiene otra configuración. Actualizá la página.")
-    body = config.model_dump(exclude_none=True)
+    body = config.storage_document()
     if destination:
         body["destination"] = destination
-    result = db().analytics_workspaces.update_one({"_id": workspace_id, "owner": owner, "deletedAt": None}, {"$set": body})
+    update = {"$set": body}
+    if "widget_number_formats" not in body:
+        update["$unset"] = {"widget_number_formats": ""}
+    result = db().analytics_workspaces.update_one({"_id": workspace_id, "owner": owner, "deletedAt": None}, update)
     if not result.matched_count:
         raise HTTPException(404, "El tablero no existe o no tenés acceso.")
     snapshots.discard_workspace(workspace_id)
-    return {"_id": workspace_id, **body}
+    return public_workspace({"_id": workspace_id, **body})
 
 
 class Publication(BaseModel):
@@ -826,7 +882,7 @@ def publish_workspace(workspace_id: str, config: Publication, owner=Depends(user
 
 @router.get("/workspaces/{workspace_id}")
 def get_workspace(workspace_id: str, owner=Depends(user)):
-    workspace = public(owned_workspace(db(), workspace_id, owner))
+    workspace = public_workspace(owned_workspace(db(), workspace_id, owner))
     if workspace.get("destination"):
         _, section = target_section(db(), workspace["destination"])
         workspace["name"] = section.get("name") or workspace["name"]
@@ -871,7 +927,7 @@ def render_workspace_section(workspace_id: str, body: SectionRenderRequest, owne
                              x_google_access_token: str = Header(default="")):
     """Render the section without rereading its spreadsheet on filter changes."""
     validate_view_filters(body.filters)
-    workspace = view_workspace(db(), workspace_id, owner)
+    workspace = adapt_stored_workspace(view_workspace(db(), workspace_id, owner))
     source = source_for(workspace["source_id"], workspace["owner"])
     fingerprint = workspace_fingerprint(workspace)
     snapshot = None
@@ -895,7 +951,7 @@ def render_workspace_section(workspace_id: str, body: SectionRenderRequest, owne
 
 
 def render_saved_chart(workspace_id, widget_id, owner, google_token, filters):
-    workspace = view_workspace(db(), workspace_id, owner)
+    workspace = adapt_stored_workspace(view_workspace(db(), workspace_id, owner))
     widget = next((w for w in workspace["widgets"] if w["id"] == widget_id), None)
     if widget is None:
         raise HTTPException(404, "Este gráfico ya no forma parte del tablero. Actualizá la página.")

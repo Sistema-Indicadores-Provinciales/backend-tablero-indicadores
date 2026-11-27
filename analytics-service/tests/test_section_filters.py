@@ -42,6 +42,76 @@ class SectionFilterTests(unittest.TestCase):
         return self.client.post('/v2/workspaces/workspace-a/render',
                                 headers=self.headers(self.viewer), json=body)
 
+    def test_saving_an_early_number_format_keeps_strict_chart_configs_readable(self):
+        collection = self.db.analytics_workspaces
+        formats = {'Año': {'style': 'decimal', 'digits': 0, 'group_digits': False}}
+        collection.update_one({}, {'$set': {'widgets.0.config.number_formats': formats}})
+
+        def editor_save(*, reset=False):
+            url = '/v2/workspaces/workspace-a'
+            headers = self.headers(self.owner)
+            editor = self.client.get(url, headers=headers).json()
+            self.assertEqual(editor['widgets'][0]['config']['number_formats'], formats)
+            if reset:
+                del editor['widgets'][0]['config']['number_formats']
+            response = self.client.put(url, headers=headers, json={
+                key: editor[key] for key in ('name', 'source_id', 'widgets', 'filter_columns')
+            })
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()
+
+        filters = {'Mes': ['Enero']}
+        before = self.render(filters).json()
+        self.assertEqual(before['widgets']['total']['data']['datasets'][0]['data'], [15])
+        saved = editor_save()
+        self.assertEqual(saved['widgets'][0]['config']['number_formats'], formats)
+        stored = collection.find_one()
+        self.assertEqual(stored['widget_number_formats'], {'monthly': formats})
+        self.assertTrue(all('number_formats' not in widget['config'] for widget in stored['widgets']))
+        after = self.render(filters).json()
+        self.assertEqual(after['widgets'], before['widgets'])
+        self.assertEqual(after['filter_options'], before['filter_options'])
+        self.assertEqual(after['workspace']['widgets'][0]['config']['number_formats'], formats)
+        self.assertNotIn('number_formats', after['workspace']['widgets'][1]['config'])
+
+        reset = editor_save(reset=True)
+        self.assertNotIn('widget_number_formats', collection.find_one())
+        self.assertNotIn('number_formats', reset['widgets'][0]['config'])
+        self.assertEqual(self.render(filters).json()['widgets'], before['widgets'])
+
+    def test_legacy_monthly_section_renders_and_saves_without_losing_its_indicator_condition(self):
+        collection = self.db.analytics_workspaces
+        legacy_defaults = {'calculated_fields': {}, 'chart_filters': {}, 'value_formats': {},
+                           'group_remaining': False, 'table_distinct': False}
+        legacy_widgets = [{**widget, 'config': {**widget['config'], **legacy_defaults}} for widget in self.widgets]
+        legacy_widgets[1]['config']['indicator_condition'] = {'count_field': 'Mes', 'max_count': 1, 'hide_zero': False}
+        collection.update_one({}, {'$set': {'widgets': legacy_widgets}})
+
+        initial = self.render()
+        self.assertEqual(initial.status_code, 200, initial.text)
+        initial_body = initial.json()
+        self.assertEqual(initial_body['widgets']['total']['data']['datasets'][0]['data'], [None])
+        self.assertEqual(initial_body['widgets']['monthly']['data']['datasets'][0]['data'], [15, 20])
+        self.assertEqual(collection.find_one()['widgets'], legacy_widgets)
+
+        filters = {'Mes': ['Enero']}
+        filtered = self.render(filters, initial_body['snapshot_id']).json()
+        self.assertEqual(filtered['widgets']['total']['data']['datasets'][0]['data'], [15])
+        self.assertEqual(self.query(filters=filters).json()['datasets'][0]['data'], [15])
+
+        url = '/v2/workspaces/workspace-a'
+        headers = self.headers(self.owner)
+        editor = self.client.get(url, headers=headers).json()
+        cfg = editor['widgets'][1]['config']
+        self.assertEqual(cfg['indicator_single_value_columns'], ['Mes'])
+        self.assertNotIn('indicator_condition', cfg)
+        self.assertTrue(legacy_defaults.keys().isdisjoint(cfg))
+        response = self.client.put(url, headers=headers, json={
+            key: editor[key] for key in ('name', 'source_id', 'widgets', 'filter_columns')
+        })
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.render(filters).json()['widgets'], filtered['widgets'])
+
     def test_section_render_reuses_one_source_snapshot_until_manual_refresh(self):
         snapshot_ids = []
         try:
